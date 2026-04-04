@@ -342,10 +342,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Windows スリープ復帰履歴ビューア")
     parser.add_argument("--start", help="開始日 (YYYY-MM-DD)", default="")
     parser.add_argument("--end", help="終了日 (YYYY-MM-DD)", default="")
+    parser.add_argument("--cli", action="store_true", help="CLIモードで明示的に実行します（全期間取得用）")
     
     args = parser.parse_args()
     
-    if args.start or args.end:
+    if args.start or args.end or args.cli:
         run_cli(args.start, args.end)
     else:
         run_gui()

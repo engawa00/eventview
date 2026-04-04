@@ -25,8 +25,8 @@ python event_viewer.py
 ### CLIモードで起動
 期間を引数で指定することで、指定期間内のログをコンソール出力します。
 ```powershell
-# 全期間を取得 (指定なし)
-python event_viewer.py
+# 全期間を取得する場合 (明示的にCLIモードを指定)
+python event_viewer.py --cli
 
 # 特定の期間を指定して取得
 python event_viewer.py --start 2026-01-01 --end 2026-03-31
