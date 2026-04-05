@@ -88,7 +88,7 @@ def get_wake_events(start_date=None, end_date=None):
                 
             if event_data is not None:
                 # 名前空間あり・なし両方対応できるようにする
-                for data in list(event_data):
+                for data in event_data:
                     name = data.get('Name')
                     text = data.text or ""
                     if name == 'SleepTime':
