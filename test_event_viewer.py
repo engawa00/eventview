@@ -1,6 +1,14 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import datetime
+import sys
+
+
+# Mock tkinter before importing event_viewer to avoid ModuleNotFoundError in environments without tkinter
+
+sys.modules['tkinter'] = MagicMock()
+sys.modules['tkinter.ttk'] = MagicMock()
+sys.modules['tkinter.messagebox'] = MagicMock()
 
 # Import the module to test
 import event_viewer
@@ -95,3 +103,84 @@ def test_get_wake_events_error(mock_run):
     assert len(events) == 1
     assert "error" in events[0]
     assert "Command failed" in events[0]["error"]
+
+
+@patch('subprocess.run')
+def test_get_wake_events_query_with_dates(mock_run):
+    # Mock return value to prevent error handling
+    mock_result = MagicMock()
+    mock_result.stdout = b"<Events></Events>"
+    mock_run.return_value = mock_result
+
+    start_date = "2026-01-01"
+    end_date = "2026-01-02"
+
+    # Mocking datetime for consistent timezone/UTC offset conversion could be needed,
+    # but the test is asserting substring match so we can just check if dates are handled.
+    event_viewer.get_wake_events(start_date=start_date, end_date=end_date)
+
+    # Ensure subprocess.run was called
+    assert mock_run.called
+
+    # Extract the cmd argument
+    args, kwargs = mock_run.call_args
+    cmd = args[0]
+
+    # Find the /q: query string argument
+    query_arg = next((arg for arg in cmd if arg.startswith("/q:")), None)
+    assert query_arg is not None
+
+    # Check that time constraints are in the query
+    assert "TimeCreated[" in query_arg
+    assert "@SystemTime>=" in query_arg
+    assert "@SystemTime<=" in query_arg
+
+    # Convert dates via module function to check exact values
+    expected_start = event_viewer.local_to_utc_str(start_date)
+    expected_end = event_viewer.local_to_utc_str(end_date, is_end_of_day=True)
+
+    assert f"@SystemTime>='{expected_start}'" in query_arg
+    assert f"@SystemTime<='{expected_end}'" in query_arg
+    assert " and " in query_arg[query_arg.find("TimeCreated["):]
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_empty(mock_get_events, mock_print):
+    mock_get_events.return_value = []
+
+    event_viewer.run_cli("2026-01-01", "2026-01-02")
+
+    mock_get_events.assert_called_once_with(start_date="2026-01-01", end_date="2026-01-02")
+
+    # Check that it printed the starting message
+    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    # Check that it printed the not found message
+    mock_print.assert_any_call("指定された期間の復帰イベントは見つかりませんでした。")
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_error(mock_get_events, mock_print):
+    mock_get_events.return_value = [{"error": "Test error occurred"}]
+
+    event_viewer.run_cli(None, None)
+
+    mock_get_events.assert_called_once_with(start_date=None, end_date=None)
+
+    # Check that it printed the error message
+    mock_print.assert_any_call("エラー: Test error occurred")
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_success(mock_get_events, mock_print):
+    mock_get_events.return_value = [
+        {"SleepTime": "2026-01-01 12:00:00", "WakeTime": "2026-01-01 13:00:00", "Reason": "Power Button"},
+        {"SleepTime": "2026-01-02 12:00:00", "WakeTime": "2026-01-02 13:00:00", "Reason": "Network Adapter"}
+    ]
+
+    event_viewer.run_cli("2026-01-01", "2026-01-02")
+
+    # Verify outputs
+    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    mock_print.assert_any_call("-" * 80)
+    mock_print.assert_any_call("[1] スリープ日時: 2026-01-01 12:00:00 | 復帰日時: 2026-01-01 13:00:00 | 理由: Power Button")
+    mock_print.assert_any_call("[2] スリープ日時: 2026-01-02 12:00:00 | 復帰日時: 2026-01-02 13:00:00 | 理由: Network Adapter")
