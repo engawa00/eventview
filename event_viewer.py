@@ -3,12 +3,17 @@ import xml.etree.ElementTree as ET
 import argparse
 import datetime
 import sys
+import os
+import shutil
 import calendar
 import tkinter as tk
 from tkinter import ttk, messagebox
 
 def local_to_utc_str(date_str, is_end_of_day=False):
-    dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    try:
+        dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"Invalid date format: '{date_str}'. Please use YYYY-MM-DD.")
     if is_end_of_day:
         dt = dt.replace(hour=23, minute=59, second=59, microsecond=999000)
     dt_aware = dt.astimezone()
@@ -50,19 +55,27 @@ def get_wake_events(start_date=None, end_date=None):
     query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
     
     time_conds = []
-    if start_date:
-        utc_start = local_to_utc_str(start_date)
-        time_conds.append(f"@SystemTime>='{utc_start}'")
-    if end_date:
-        utc_end = local_to_utc_str(end_date, is_end_of_day=True)
-        time_conds.append(f"@SystemTime<='{utc_end}'")
+    try:
+        if start_date:
+            utc_start = local_to_utc_str(start_date)
+            time_conds.append(f"@SystemTime>='{utc_start}'")
+        if end_date:
+            utc_end = local_to_utc_str(end_date, is_end_of_day=True)
+            time_conds.append(f"@SystemTime<='{utc_end}'")
+    except ValueError as e:
+        return [{"error": str(e)}]
         
     if time_conds:
         query += f" and TimeCreated[{' and '.join(time_conds)}]"
         
     query += "]]"
     
-    cmd = ['wevtutil', 'qe', 'System', f'/q:{query}', '/f:xml']
+    wevtutil_path = shutil.which('wevtutil')
+    if not wevtutil_path:
+        # Fallback to standard location
+        wevtutil_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
+
+    cmd = [wevtutil_path, 'qe', 'System', f'/q:{query}', '/f:xml']
     
     creationflags = 0
     if sys.platform == 'win32':

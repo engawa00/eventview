@@ -143,6 +143,19 @@ def test_get_wake_events_query_with_dates(mock_run):
     assert f"@SystemTime<='{expected_end}'" in query_arg
     assert " and " in query_arg[query_arg.find("TimeCreated["):]
 
+
+def test_local_to_utc_str_invalid():
+    with pytest.raises(ValueError) as excinfo:
+        event_viewer.local_to_utc_str("invalid-date")
+    assert "Invalid date format" in str(excinfo.value)
+
+def test_get_wake_events_invalid_date():
+    # Pass an invalid date string to get_wake_events
+    events = event_viewer.get_wake_events(start_date="not-a-date")
+    assert len(events) == 1
+    assert "error" in events[0]
+    assert "Invalid date format" in events[0]["error"]
+
 @patch('builtins.print')
 @patch('event_viewer.get_wake_events')
 def test_run_cli_empty(mock_get_events, mock_print):
