@@ -18,16 +18,24 @@ def local_to_utc_str(date_str, is_end_of_day=False):
 def parse_utc_to_local(utc_str):
     if not utc_str:
         return ""
-    try:
-        dt_utc = datetime.datetime.strptime(utc_str[:26]+"Z", "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
-    except ValueError:
-        try:
-            dt_utc = datetime.datetime.strptime(utc_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
-        except ValueError:
-            return utc_str
-            
-    dt_local = dt_utc.astimezone()
-    return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+
+    if len(utc_str) >= 20 and utc_str[-1] == "Z" and utc_str[10] == "T":
+        if "." in utc_str:
+            try:
+                dt_utc = datetime.datetime.strptime(utc_str[:26]+"Z", "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+                dt_local = dt_utc.astimezone()
+                return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+        else:
+            try:
+                dt_utc = datetime.datetime.strptime(utc_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+                dt_local = dt_utc.astimezone()
+                return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+
+    return utc_str
 
 def get_wake_events(start_date=None, end_date=None):
     query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
