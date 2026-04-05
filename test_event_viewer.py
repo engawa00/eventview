@@ -151,3 +151,45 @@ def test_get_wake_events_invalid_date():
     assert len(events) == 1
     assert "error" in events[0]
     assert "Invalid date format" in events[0]["error"]
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_empty(mock_get_events, mock_print):
+    mock_get_events.return_value = []
+
+    event_viewer.run_cli("2026-01-01", "2026-01-02")
+
+    mock_get_events.assert_called_once_with(start_date="2026-01-01", end_date="2026-01-02")
+
+    # Check that it printed the starting message
+    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    # Check that it printed the not found message
+    mock_print.assert_any_call("指定された期間の復帰イベントは見つかりませんでした。")
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_error(mock_get_events, mock_print):
+    mock_get_events.return_value = [{"error": "Test error occurred"}]
+
+    event_viewer.run_cli(None, None)
+
+    mock_get_events.assert_called_once_with(start_date=None, end_date=None)
+
+    # Check that it printed the error message
+    mock_print.assert_any_call("エラー: Test error occurred")
+
+@patch('builtins.print')
+@patch('event_viewer.get_wake_events')
+def test_run_cli_success(mock_get_events, mock_print):
+    mock_get_events.return_value = [
+        {"SleepTime": "2026-01-01 12:00:00", "WakeTime": "2026-01-01 13:00:00", "Reason": "Power Button"},
+        {"SleepTime": "2026-01-02 12:00:00", "WakeTime": "2026-01-02 13:00:00", "Reason": "Network Adapter"}
+    ]
+
+    event_viewer.run_cli("2026-01-01", "2026-01-02")
+
+    # Verify outputs
+    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    mock_print.assert_any_call("-" * 80)
+    mock_print.assert_any_call("[1] スリープ日時: 2026-01-01 12:00:00 | 復帰日時: 2026-01-01 13:00:00 | 理由: Power Button")
+    mock_print.assert_any_call("[2] スリープ日時: 2026-01-02 12:00:00 | 復帰日時: 2026-01-02 13:00:00 | 理由: Network Adapter")
