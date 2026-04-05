@@ -74,7 +74,7 @@ def get_wake_events(start_date=None, end_date=None):
         root = ET.fromstring(xml_doc)
         ns = {'win': 'http://schemas.microsoft.com/win/2004/08/events/event'}
         
-        for event in root.findall('win:Event', ns) or root.findall('.//Event') or root.findall('{http://schemas.microsoft.com/win/2004/08/events/event}Event'):
+        for event in root.findall('win:Event', ns) or root.findall('Event') or root.findall('{http://schemas.microsoft.com/win/2004/08/events/event}Event'):
             sleep_time = ""
             wake_time = ""
             wake_reason = ""
