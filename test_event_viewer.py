@@ -1,6 +1,12 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import datetime
+import sys
+
+# Mock tkinter for headless test environment
+sys.modules['tkinter'] = MagicMock()
+sys.modules['tkinter.ttk'] = MagicMock()
+sys.modules['tkinter.messagebox'] = MagicMock()
 
 # Import the module to test
 import event_viewer
@@ -95,3 +101,41 @@ def test_get_wake_events_error(mock_run):
     assert len(events) == 1
     assert "error" in events[0]
     assert "Command failed" in events[0]["error"]
+
+@patch('subprocess.run')
+def test_get_wake_events_query_with_dates(mock_run):
+    # Mock return value to prevent error handling
+    mock_result = MagicMock()
+    mock_result.stdout = b"<Events></Events>"
+    mock_run.return_value = mock_result
+
+    start_date = "2026-01-01"
+    end_date = "2026-01-02"
+
+    # Mocking datetime for consistent timezone/UTC offset conversion could be needed,
+    # but the test is asserting substring match so we can just check if dates are handled.
+    event_viewer.get_wake_events(start_date=start_date, end_date=end_date)
+
+    # Ensure subprocess.run was called
+    assert mock_run.called
+
+    # Extract the cmd argument
+    args, kwargs = mock_run.call_args
+    cmd = args[0]
+
+    # Find the /q: query string argument
+    query_arg = next((arg for arg in cmd if arg.startswith("/q:")), None)
+    assert query_arg is not None
+
+    # Check that time constraints are in the query
+    assert "TimeCreated[" in query_arg
+    assert "@SystemTime>=" in query_arg
+    assert "@SystemTime<=" in query_arg
+
+    # Convert dates via module function to check exact values
+    expected_start = event_viewer.local_to_utc_str(start_date)
+    expected_end = event_viewer.local_to_utc_str(end_date, is_end_of_day=True)
+
+    assert f"@SystemTime>='{expected_start}'" in query_arg
+    assert f"@SystemTime<='{expected_end}'" in query_arg
+    assert " and " in query_arg[query_arg.find("TimeCreated["):]
