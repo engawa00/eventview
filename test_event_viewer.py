@@ -3,9 +3,7 @@ from unittest.mock import patch, MagicMock
 import datetime
 import sys
 
-
 # Mock tkinter before importing event_viewer to avoid ModuleNotFoundError in environments without tkinter
-
 sys.modules['tkinter'] = MagicMock()
 sys.modules['tkinter.ttk'] = MagicMock()
 sys.modules['tkinter.messagebox'] = MagicMock()
@@ -104,7 +102,6 @@ def test_get_wake_events_error(mock_run):
     assert "error" in events[0]
     assert "Command failed" in events[0]["error"]
 
-
 @patch('subprocess.run')
 def test_get_wake_events_query_with_dates(mock_run):
     # Mock return value to prevent error handling
@@ -142,7 +139,6 @@ def test_get_wake_events_query_with_dates(mock_run):
     assert f"@SystemTime>='{expected_start}'" in query_arg
     assert f"@SystemTime<='{expected_end}'" in query_arg
     assert " and " in query_arg[query_arg.find("TimeCreated["):]
-
 
 def test_local_to_utc_str_invalid():
     with pytest.raises(ValueError) as excinfo:
