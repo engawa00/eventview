@@ -1,6 +1,13 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import datetime
+import sys
+
+# Mock tkinter before importing event_viewer
+mock_tk = MagicMock()
+sys.modules['tkinter'] = mock_tk
+sys.modules['tkinter.ttk'] = MagicMock()
+sys.modules['tkinter.messagebox'] = MagicMock()
 
 # Import the module to test
 import event_viewer
@@ -95,3 +102,15 @@ def test_get_wake_events_error(mock_run):
     assert len(events) == 1
     assert "error" in events[0]
     assert "Command failed" in events[0]["error"]
+
+def test_local_to_utc_str_invalid():
+    with pytest.raises(ValueError) as excinfo:
+        event_viewer.local_to_utc_str("invalid-date")
+    assert "Invalid date format" in str(excinfo.value)
+
+def test_get_wake_events_invalid_date():
+    # Pass an invalid date string to get_wake_events
+    events = event_viewer.get_wake_events(start_date="not-a-date")
+    assert len(events) == 1
+    assert "error" in events[0]
+    assert "Invalid date format" in events[0]["error"]
