@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import datetime
 import sys
 
-# Mock tkinter for headless test environment
+# Mock tkinter before importing event_viewer to avoid ModuleNotFoundError in environments without tkinter
 sys.modules['tkinter'] = MagicMock()
 sys.modules['tkinter.ttk'] = MagicMock()
 sys.modules['tkinter.messagebox'] = MagicMock()

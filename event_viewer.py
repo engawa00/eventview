@@ -15,6 +15,15 @@ def local_to_utc_str(date_str, is_end_of_day=False):
     dt_utc = dt_aware.astimezone(datetime.timezone.utc)
     return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
+def validate_date(date_str):
+    if date_str:
+        try:
+            datetime.datetime.strptime(date_str, "%Y-%m-%d")
+            return True
+        except ValueError:
+            return False
+    return True
+
 def parse_utc_to_local(utc_str):
     if not utc_str:
         return ""
@@ -311,16 +320,7 @@ def run_gui():
         start_val = start_entry.get().strip() or None
         end_val = end_entry.get().strip() or None
         
-        def validate(date_str):
-            if date_str:
-                try:
-                    datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                    return True
-                except ValueError:
-                    return False
-            return True
-            
-        if not validate(start_val) or not validate(end_val):
+        if not validate_date(start_val) or not validate_date(end_val):
             messagebox.showerror("入力エラー", "日付は YYYY-MM-DD の形式で入力してください。")
             return
             
