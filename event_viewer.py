@@ -360,9 +360,19 @@ def run_gui():
     root.mainloop()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Windows スリープ復帰履歴ビューア")
-    parser.add_argument("--start", help="開始日 (YYYY-MM-DD)", default="")
-    parser.add_argument("--end", help="終了日 (YYYY-MM-DD)", default="")
+    epilog_text = (
+        "💡 使い方（CLI）:\n"
+        "  python event_viewer.py --start 2023-10-01 --end 2023-10-31\n"
+        "  python event_viewer.py --cli  # 全期間の履歴を取得して表示\n\n"
+        "📝 引数を指定せずに実行すると、GUIモードで起動します。"
+    )
+    parser = argparse.ArgumentParser(
+        description="Windows Wake Event Viewer",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog=epilog_text
+    )
+    parser.add_argument("--start", metavar="YYYY-MM-DD", help="開始日 (例: 2023-10-01)", default="")
+    parser.add_argument("--end", metavar="YYYY-MM-DD", help="終了日 (例: 2023-10-31)", default="")
     parser.add_argument("--cli", action="store_true", help="CLIモードで明示的に実行します（全期間取得用）")
     
     args = parser.parse_args()
