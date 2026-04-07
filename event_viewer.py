@@ -361,10 +361,10 @@ def run_gui():
 
 if __name__ == "__main__":
     epilog_text = (
-        "💡 使い方（CLI）:\n"
+        "使い方（CLI）:\n"
         "  python event_viewer.py --start 2023-10-01 --end 2023-10-31\n"
         "  python event_viewer.py --cli  # 全期間の履歴を取得して表示\n\n"
-        "📝 引数を指定せずに実行すると、GUIモードで起動します。"
+        "引数を指定せずに実行すると、GUIモードで起動します。"
     )
     parser = argparse.ArgumentParser(
         description="Windows Wake Event Viewer",
