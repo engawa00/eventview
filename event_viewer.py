@@ -257,92 +257,93 @@ class CalendarDialog(tk.Toplevel):
         self.target_entry.insert(0, date_str)
         self.destroy()
 
-def run_gui():
-    root = tk.Tk()
-    root.title("Windows Wake Event Viewer")
-    root.geometry("700x550")
-    
-    frame = ttk.Frame(root, padding="10")
-    frame.pack(fill=tk.BOTH, expand=True)
-    
-    input_frame = ttk.Frame(frame)
-    input_frame.pack(fill=tk.X, pady=(0, 10))
-    
-    ttk.Label(input_frame, text="開始日 (YYYY-MM-DD):").pack(side=tk.LEFT, padx=(0, 5))
-    start_entry = ttk.Entry(input_frame, width=12)
-    start_entry.pack(side=tk.LEFT, padx=(0, 5))
-    ttk.Button(input_frame, text="📅", width=3, command=lambda: CalendarDialog(root, start_entry)).pack(side=tk.LEFT, padx=(0, 15))
-    
-    ttk.Label(input_frame, text="終了日 (YYYY-MM-DD):").pack(side=tk.LEFT, padx=(0, 5))
-    end_entry = ttk.Entry(input_frame, width=12)
-    end_entry.pack(side=tk.LEFT, padx=(0, 5))
-    ttk.Button(input_frame, text="📅", width=3, command=lambda: CalendarDialog(root, end_entry)).pack(side=tk.LEFT, padx=(0, 15))
-    
-    fetch_btn = ttk.Button(input_frame, text="検索")
-    fetch_btn.pack(side=tk.LEFT)
-    
-    paned = ttk.PanedWindow(frame, orient=tk.VERTICAL)
-    paned.pack(fill=tk.BOTH, expand=True)
-    
-    tree_frame = ttk.Frame(paned)
-    paned.add(tree_frame, weight=3)
-    
-    columns = ("SleepTime", "WakeTime", "Reason")
-    tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
-    tree.heading("SleepTime", text="スリープ日時")
-    tree.heading("WakeTime", text="復帰日時")
-    tree.heading("Reason", text="復帰理由")
-    
-    tree.column("SleepTime", width=160, anchor="center")
-    tree.column("WakeTime", width=160, anchor="center")
-    tree.column("Reason", width=300, anchor="w")
-    
-    scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=tree.yview)
-    tree.configure(yscroll=scrollbar.set)
-    
-    tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    
-    details_frame = ttk.Frame(paned)
-    paned.add(details_frame, weight=1)
-    
-    ttk.Label(details_frame, text="復帰理由 詳細:").pack(anchor=tk.W, pady=(5, 2))
-    details_text = tk.Text(details_frame, height=5, wrap=tk.WORD, state=tk.DISABLED)
-    details_text.pack(fill=tk.BOTH, expand=True)
-    
-    def on_tree_select(event):
-        selected = tree.selection()
-        details_text.config(state=tk.NORMAL)
-        details_text.delete(1.0, tk.END)
+class WakeEventViewerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Windows Wake Event Viewer")
+        self.root.geometry("700x550")
+
+        self.frame = ttk.Frame(self.root, padding="10")
+        self.frame.pack(fill=tk.BOTH, expand=True)
+
+        self.input_frame = ttk.Frame(self.frame)
+        self.input_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(self.input_frame, text="開始日 (YYYY-MM-DD):").pack(side=tk.LEFT, padx=(0, 5))
+        self.start_entry = ttk.Entry(self.input_frame, width=12)
+        self.start_entry.pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(self.input_frame, text="📅", width=3, command=lambda: CalendarDialog(self.root, self.start_entry)).pack(side=tk.LEFT, padx=(0, 15))
+
+        ttk.Label(self.input_frame, text="終了日 (YYYY-MM-DD):").pack(side=tk.LEFT, padx=(0, 5))
+        self.end_entry = ttk.Entry(self.input_frame, width=12)
+        self.end_entry.pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(self.input_frame, text="📅", width=3, command=lambda: CalendarDialog(self.root, self.end_entry)).pack(side=tk.LEFT, padx=(0, 15))
+
+        self.fetch_btn = ttk.Button(self.input_frame, text="検索", command=self.fetch_data)
+        self.fetch_btn.pack(side=tk.LEFT)
+
+        self.paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
+        self.paned.pack(fill=tk.BOTH, expand=True)
+
+        self.tree_frame = ttk.Frame(self.paned)
+        self.paned.add(self.tree_frame, weight=3)
+
+        columns = ("SleepTime", "WakeTime", "Reason")
+        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings")
+        self.tree.heading("SleepTime", text="スリープ日時")
+        self.tree.heading("WakeTime", text="復帰日時")
+        self.tree.heading("Reason", text="復帰理由")
+
+        self.tree.column("SleepTime", width=160, anchor="center")
+        self.tree.column("WakeTime", width=160, anchor="center")
+        self.tree.column("Reason", width=300, anchor="w")
+
+        self.scrollbar = ttk.Scrollbar(self.tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscroll=self.scrollbar.set)
+
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.details_frame = ttk.Frame(self.paned)
+        self.paned.add(self.details_frame, weight=1)
+
+        ttk.Label(self.details_frame, text="復帰理由 詳細:").pack(anchor=tk.W, pady=(5, 2))
+        self.details_text = tk.Text(self.details_frame, height=5, wrap=tk.WORD, state=tk.DISABLED)
+        self.details_text.pack(fill=tk.BOTH, expand=True)
+
+        self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
+
+    def on_tree_select(self, event):
+        selected = self.tree.selection()
+        self.details_text.config(state=tk.NORMAL)
+        self.details_text.delete(1.0, tk.END)
         if selected:
-            item = tree.item(selected[0])
+            item = self.tree.item(selected[0])
             reason = item['values'][2] if len(item['values']) > 2 else ""
-            details_text.insert(tk.END, reason)
-        details_text.config(state=tk.DISABLED)
+            self.details_text.insert(tk.END, reason)
+        self.details_text.config(state=tk.DISABLED)
         
-    tree.bind('<<TreeviewSelect>>', on_tree_select)
-    
-    def fetch_data():
-        for item in tree.get_children():
-            tree.delete(item)
+    def fetch_data(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
             
-        details_text.config(state=tk.NORMAL)
-        details_text.delete(1.0, tk.END)
-        details_text.config(state=tk.DISABLED)
+        self.details_text.config(state=tk.NORMAL)
+        self.details_text.delete(1.0, tk.END)
+        self.details_text.config(state=tk.DISABLED)
             
-        start_val = start_entry.get().strip() or None
-        end_val = end_entry.get().strip() or None
+        start_val = self.start_entry.get().strip() or None
+        end_val = self.end_entry.get().strip() or None
         
         if not validate_date(start_val) or not validate_date(end_val):
             messagebox.showerror("入力エラー", "日付は YYYY-MM-DD の形式で入力してください。")
             return
             
-        fetch_btn.config(state=tk.DISABLED)
-        root.update()
+        self.fetch_btn.config(state=tk.DISABLED)
+        self.root.update()
         
         events = get_wake_events(start_val, end_val)
         
-        fetch_btn.config(state=tk.NORMAL)
+        self.fetch_btn.config(state=tk.NORMAL)
         
         if events and "error" in events[0]:
             messagebox.showerror("エラー", events[0]["error"])
@@ -353,10 +354,11 @@ def run_gui():
             return
             
         for ev in events:
-            tree.insert("", tk.END, values=(ev.get("SleepTime"), ev.get("WakeTime"), ev.get("Reason")))
-            
-    fetch_btn.config(command=fetch_data)
-    
+            self.tree.insert("", tk.END, values=(ev.get("SleepTime"), ev.get("WakeTime"), ev.get("Reason")))
+
+def run_gui():
+    root = tk.Tk()
+    app = WakeEventViewerApp(root)
     root.mainloop()
 
 if __name__ == "__main__":
