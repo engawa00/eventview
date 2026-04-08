@@ -4,9 +4,14 @@ import datetime
 import sys
 
 # Mock tkinter before importing event_viewer to avoid ModuleNotFoundError in environments without tkinter
-sys.modules['tkinter'] = MagicMock()
-sys.modules['tkinter.ttk'] = MagicMock()
-sys.modules['tkinter.messagebox'] = MagicMock()
+try:
+    import tkinter
+    import tkinter.ttk
+    import tkinter.messagebox
+except ImportError:
+    sys.modules['tkinter'] = MagicMock()
+    sys.modules['tkinter.ttk'] = MagicMock()
+    sys.modules['tkinter.messagebox'] = MagicMock()
 
 # Import the module to test
 import event_viewer
