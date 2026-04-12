@@ -98,6 +98,18 @@ def test_get_wake_events_success(mock_run):
     assert events[1]["Reason"] == "電源ボタン (Power Button)"
 
 @patch('subprocess.run')
+def test_get_wake_events_invalid_xml(mock_run):
+    # Simulate invalid XML returned by wevtutil
+    mock_result = MagicMock()
+    mock_result.stdout = b"<Event><System><EventID>1</EventID></System>" # Missing closing tags
+    mock_run.return_value = mock_result
+
+    events = event_viewer.get_wake_events()
+    assert len(events) == 1
+    assert "error" in events[0]
+    assert "Failed to parse XML" in events[0]["error"]
+
+@patch('subprocess.run')
 def test_get_wake_events_error(mock_run):
     # Simulate an OS error during subprocess run
     mock_run.side_effect = Exception("Command failed")
