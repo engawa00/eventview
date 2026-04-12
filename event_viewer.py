@@ -324,8 +324,7 @@ class WakeEventViewerApp:
         self.details_text.config(state=tk.DISABLED)
         
     def fetch_data(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.tree.delete(*self.tree.get_children())
             
         self.details_text.config(state=tk.NORMAL)
         self.details_text.delete(1.0, tk.END)
