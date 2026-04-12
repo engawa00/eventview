@@ -6,6 +6,7 @@ import sys
 import os
 import calendar
 import tkinter as tk
+import functools
 from tkinter import ttk, messagebox
 
 def local_to_utc_str(date_str, is_end_of_day=False):
@@ -50,6 +51,10 @@ def parse_utc_to_local(utc_str):
 
     return utc_str
 
+@functools.lru_cache(maxsize=1)
+def get_wevtutil_path():
+    return os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
+
 def get_wake_events(start_date=None, end_date=None):
     query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
     
@@ -70,7 +75,7 @@ def get_wake_events(start_date=None, end_date=None):
     query += "]]"
     
     # Hardcode the absolute path to wevtutil to prevent PATH hijacking
-    wevtutil_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
+    wevtutil_path = get_wevtutil_path()
 
     cmd = [wevtutil_path, 'qe', 'System', f'/q:{query}', '/f:xml']
     
