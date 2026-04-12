@@ -101,17 +101,17 @@ def get_wake_events(start_date=None, end_date=None):
         root = ET.fromstring(xml_doc)
         ns = {'win': 'http://schemas.microsoft.com/win/2004/08/events/event'}
         
-        for event in root.findall('win:Event', ns) or root.findall('Event') or root.findall('{http://schemas.microsoft.com/win/2004/08/events/event}Event'):
+        event_paths = ('win:Event', 'Event', '{http://schemas.microsoft.com/win/2004/08/events/event}Event')
+        events = next((nodes for p in event_paths if (nodes := root.findall(p, ns))), [])
+
+        for event in events:
             sleep_time = ""
             wake_time = ""
             wake_reason = ""
             wake_type = ""
             
-            event_data = event.find('win:EventData', ns)
-            if event_data is None:
-                event_data = event.find('{http://schemas.microsoft.com/win/2004/08/events/event}EventData')
-            if event_data is None:
-                event_data = event.find('EventData')
+            data_paths = ('win:EventData', '{http://schemas.microsoft.com/win/2004/08/events/event}EventData', 'EventData')
+            event_data = next((node for p in data_paths if (node := event.find(p, ns)) is not None), None)
                 
             if event_data is not None:
                 # 名前空間あり・なし両方対応できるようにする
