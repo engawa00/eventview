@@ -4,7 +4,6 @@ import argparse
 import datetime
 import sys
 import os
-import shutil
 import calendar
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -70,10 +69,8 @@ def get_wake_events(start_date=None, end_date=None):
         
     query += "]]"
     
-    wevtutil_path = shutil.which('wevtutil')
-    if not wevtutil_path:
-        # Fallback to standard location
-        wevtutil_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
+    # Hardcode the absolute path to wevtutil to prevent PATH hijacking
+    wevtutil_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
 
     cmd = [wevtutil_path, 'qe', 'System', f'/q:{query}', '/f:xml']
     
