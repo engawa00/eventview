@@ -48,6 +48,15 @@ def test_parse_utc_to_local_invalid():
     # Invalid string should just return as is when parsing fails
     assert event_viewer.parse_utc_to_local("invalid_date") == "invalid_date"
 
+def test_parse_utc_to_local_value_error():
+    # Invalid date with dot (fractional seconds) - Month 13
+    invalid_with_dot = "2026-13-01T12:00:00.000Z"
+    assert event_viewer.parse_utc_to_local(invalid_with_dot) == invalid_with_dot
+
+    # Invalid date without dot - Day 32
+    invalid_without_dot = "2026-01-32T12:00:00Z"
+    assert event_viewer.parse_utc_to_local(invalid_without_dot) == invalid_without_dot
+
 @patch('subprocess.run')
 def test_get_wake_events_empty_output(mock_run):
     mock_result = MagicMock()
