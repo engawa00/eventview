@@ -91,6 +91,50 @@ def test_get_wake_events_success(mock_run):
         <Data Name="WakeSourceText"></Data>
       </EventData>
     </Event>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <EventID>1</EventID>
+      </System>
+      <EventData>
+        <Data Name="SleepTime">2026-01-03T12:00:00.000Z</Data>
+        <Data Name="WakeTime">2026-01-03T13:00:00.000Z</Data>
+        <Data Name="WakeSourceType">0</Data>
+        <Data Name="WakeSourceText"></Data>
+      </EventData>
+    </Event>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <EventID>1</EventID>
+      </System>
+      <EventData>
+        <Data Name="SleepTime">2026-01-04T12:00:00.000Z</Data>
+        <Data Name="WakeTime">2026-01-04T13:00:00.000Z</Data>
+        <Data Name="WakeSourceType">8</Data>
+        <Data Name="WakeSourceText"></Data>
+      </EventData>
+    </Event>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <EventID>1</EventID>
+      </System>
+      <EventData>
+        <Data Name="SleepTime">2026-01-05T12:00:00.000Z</Data>
+        <Data Name="WakeTime">2026-01-05T13:00:00.000Z</Data>
+        <Data Name="WakeSourceType">5</Data>
+        <Data Name="WakeSourceText"></Data>
+      </EventData>
+    </Event>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <EventID>1</EventID>
+      </System>
+      <EventData>
+        <Data Name="SleepTime">2026-01-06T12:00:00.000Z</Data>
+        <Data Name="WakeTime">2026-01-06T13:00:00.000Z</Data>
+        <Data Name="WakeSourceType"></Data>
+        <Data Name="WakeSourceText"></Data>
+      </EventData>
+    </Event>
     """
     mock_result = MagicMock()
     # Mocking stdout output with utf-8 payload
@@ -98,13 +142,25 @@ def test_get_wake_events_success(mock_run):
     mock_run.return_value = mock_result
     
     events = event_viewer.get_wake_events()
-    assert len(events) == 2
+    assert len(events) == 6
     
     # Check first event
     assert events[0]["Reason"] == "Network Adapter"
     
     # Check second event (Empty WakeSourceText fallback to type 1 -> Power Button)
     assert events[1]["Reason"] == "電源ボタン (Power Button)"
+
+    # Check third event (Empty WakeSourceText fallback to type 0 -> Unknown)
+    assert events[2]["Reason"] == "不明 (Unknown)"
+
+    # Check fourth event (Empty WakeSourceText fallback to type 8 -> Device / API)
+    assert events[3]["Reason"] == "デバイス または API (Device / API)"
+
+    # Check fifth event (Empty WakeSourceText fallback to type 5 -> Type 5)
+    assert events[4]["Reason"] == "Type 5"
+
+    # Check sixth event (Empty WakeSourceText and empty WakeSourceType fallback -> 不明)
+    assert events[5]["Reason"] == "不明"
 
 @patch('subprocess.run')
 def test_get_wake_events_invalid_xml(mock_run):
