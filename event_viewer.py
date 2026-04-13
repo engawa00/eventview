@@ -55,7 +55,7 @@ def parse_utc_to_local(utc_str):
 def get_wevtutil_path():
     return os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'System32', 'wevtutil.exe')
 
-def get_wake_events(start_date=None, end_date=None):
+def _build_wevtutil_query(start_date=None, end_date=None):
     query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
     
     time_conds = []
@@ -70,7 +70,9 @@ def get_wake_events(start_date=None, end_date=None):
         query += f" and TimeCreated[{' and '.join(time_conds)}]"
         
     query += "]]"
-    
+    return query
+
+def _execute_wevtutil_query(query):
     # Hardcode the absolute path to wevtutil to prevent PATH hijacking
     wevtutil_path = get_wevtutil_path()
 
@@ -88,6 +90,9 @@ def get_wake_events(start_date=None, end_date=None):
     except UnicodeDecodeError:
         xml_output = result.stdout.decode('utf-8', errors='replace')
         
+    return xml_output
+
+def _parse_wake_events_xml(xml_output):
     if not xml_output.strip():
         return []
 
@@ -147,6 +152,11 @@ def get_wake_events(start_date=None, end_date=None):
         raise RuntimeError(f"Failed to parse XML: {e}")
         
     return events_data
+
+def get_wake_events(start_date=None, end_date=None):
+    query = _build_wevtutil_query(start_date, end_date)
+    xml_output = _execute_wevtutil_query(query)
+    return _parse_wake_events_xml(xml_output)
 
 def run_cli(start, end):
     print(f"スリープ復帰履歴を取得中... (開始: {start or '指定なし'}, 終了: {end or '指定なし'})")
