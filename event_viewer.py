@@ -59,15 +59,12 @@ def get_wake_events(start_date=None, end_date=None):
     query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
     
     time_conds = []
-    try:
-        if start_date:
-            utc_start = local_to_utc_str(start_date)
-            time_conds.append(f"@SystemTime>='{utc_start}'")
-        if end_date:
-            utc_end = local_to_utc_str(end_date, is_end_of_day=True)
-            time_conds.append(f"@SystemTime<='{utc_end}'")
-    except ValueError as e:
-        return [{"error": str(e)}]
+    if start_date:
+        utc_start = local_to_utc_str(start_date)
+        time_conds.append(f"@SystemTime>='{utc_start}'")
+    if end_date:
+        utc_end = local_to_utc_str(end_date, is_end_of_day=True)
+        time_conds.append(f"@SystemTime<='{utc_end}'")
         
     if time_conds:
         query += f" and TimeCreated[{' and '.join(time_conds)}]"
@@ -83,17 +80,13 @@ def get_wake_events(start_date=None, end_date=None):
     if sys.platform == 'win32':
         creationflags = 0x08000000  # CREATE_NO_WINDOW
         
+    result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
+
+    # Windowsのコマンドプロンプト出力は通常cp932または適宜エンコーディングされるため、フォールバックしつつデコード
     try:
-        result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
-        
-        # Windowsのコマンドプロンプト出力は通常cp932または適宜エンコーディングされるため、フォールバックしつつデコード
-        try:
-            xml_output = result.stdout.decode('cp932')
-        except UnicodeDecodeError:
-            xml_output = result.stdout.decode('utf-8', errors='replace')
-            
-    except Exception as e:
-        return [{"error": str(e)}]
+        xml_output = result.stdout.decode('cp932')
+    except UnicodeDecodeError:
+        xml_output = result.stdout.decode('utf-8', errors='replace')
         
     if not xml_output.strip():
         return []
@@ -151,20 +144,20 @@ def get_wake_events(start_date=None, end_date=None):
             })
             
     except ET.ParseError as e:
-        events_data.append({"error": f"Failed to parse XML: {e}"})
+        raise RuntimeError(f"Failed to parse XML: {e}")
         
     return events_data
 
 def run_cli(start, end):
     print(f"スリープ復帰履歴を取得中... (開始: {start or '指定なし'}, 終了: {end or '指定なし'})")
-    events = get_wake_events(start_date=start, end_date=end)
+    try:
+        events = get_wake_events(start_date=start, end_date=end)
+    except Exception as e:
+        print(f"エラー: {e}")
+        return
     
     if not events:
         print("指定された期間の復帰イベントは見つかりませんでした。")
-        return
-        
-    if "error" in events[0]:
-        print(f"エラー: {events[0]['error']}")
         return
         
     print("-" * 80)
@@ -342,13 +335,14 @@ class WakeEventViewerApp:
         self.fetch_btn.config(state=tk.DISABLED)
         self.root.update()
         
-        events = get_wake_events(start_val, end_val)
-        
-        self.fetch_btn.config(state=tk.NORMAL)
-        
-        if events and "error" in events[0]:
-            messagebox.showerror("エラー", events[0]["error"])
+        try:
+            events = get_wake_events(start_val, end_val)
+        except Exception as e:
+            self.fetch_btn.config(state=tk.NORMAL)
+            messagebox.showerror("エラー", str(e))
             return
+
+        self.fetch_btn.config(state=tk.NORMAL)
         
         if not events:
             messagebox.showinfo("結果", "指定された期間の復帰イベントは見つかりませんでした。")

@@ -113,20 +113,18 @@ def test_get_wake_events_invalid_xml(mock_run):
     mock_result.stdout = b"<Event><System><EventID>1</EventID></System>" # Missing closing tags
     mock_run.return_value = mock_result
 
-    events = event_viewer.get_wake_events()
-    assert len(events) == 1
-    assert "error" in events[0]
-    assert "Failed to parse XML" in events[0]["error"]
+    with pytest.raises(RuntimeError) as excinfo:
+        event_viewer.get_wake_events()
+    assert "Failed to parse XML" in str(excinfo.value)
 
 @patch('subprocess.run')
 def test_get_wake_events_error(mock_run):
     # Simulate an OS error during subprocess run
     mock_run.side_effect = Exception("Command failed")
     
-    events = event_viewer.get_wake_events()
-    assert len(events) == 1
-    assert "error" in events[0]
-    assert "Command failed" in events[0]["error"]
+    with pytest.raises(Exception) as excinfo:
+        event_viewer.get_wake_events()
+    assert "Command failed" in str(excinfo.value)
 
 @patch('subprocess.run')
 def test_get_wake_events_query_with_dates(mock_run):
@@ -173,10 +171,9 @@ def test_local_to_utc_str_invalid():
 
 def test_get_wake_events_invalid_date():
     # Pass an invalid date string to get_wake_events
-    events = event_viewer.get_wake_events(start_date="not-a-date")
-    assert len(events) == 1
-    assert "error" in events[0]
-    assert "Invalid date format" in events[0]["error"]
+    with pytest.raises(ValueError) as excinfo:
+        event_viewer.get_wake_events(start_date="not-a-date")
+    assert "Invalid date format" in str(excinfo.value)
 
 @patch('builtins.print')
 @patch('event_viewer.get_wake_events')
@@ -195,7 +192,7 @@ def test_run_cli_empty(mock_get_events, mock_print):
 @patch('builtins.print')
 @patch('event_viewer.get_wake_events')
 def test_run_cli_error(mock_get_events, mock_print):
-    mock_get_events.return_value = [{"error": "Test error occurred"}]
+    mock_get_events.side_effect = Exception("Test error occurred")
 
     event_viewer.run_cli(None, None)
 
