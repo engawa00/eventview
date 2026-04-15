@@ -36,7 +36,9 @@ def parse_utc_to_local(utc_str):
     if len(utc_str) >= 20 and utc_str[-1] == "Z" and utc_str[10] == "T":
         if "." in utc_str:
             try:
-                dt_utc = datetime.datetime.strptime(utc_str[:26]+"Z", "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+                base, frac = utc_str[:-1].split('.', 1)
+                frac = frac[:6]
+                dt_utc = datetime.datetime.strptime(f"{base}.{frac}Z", "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
                 dt_local = dt_utc.astimezone()
                 return dt_local.strftime("%Y-%m-%d %H:%M:%S")
             except ValueError:
