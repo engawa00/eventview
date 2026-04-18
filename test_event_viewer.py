@@ -272,3 +272,40 @@ def test_run_cli_success(mock_get_events, mock_print):
     mock_print.assert_any_call("-" * 80)
     mock_print.assert_any_call("[1] スリープ日時: 2026-01-01 12:00:00 | 復帰日時: 2026-01-01 13:00:00 | 理由: Power Button")
     mock_print.assert_any_call("[2] スリープ日時: 2026-01-02 12:00:00 | 復帰日時: 2026-01-02 13:00:00 | 理由: Network Adapter")
+
+import os
+import zipfile
+import release
+
+@patch('builtins.input')
+def test_create_release_zip(mock_input):
+    # Setup test variables
+    test_version = "test-0.0.1"
+    mock_input.return_value = test_version
+
+    script_dir = os.path.dirname(os.path.abspath(release.__file__))
+    expected_zip_path = os.path.join(script_dir, f"eventview_{test_version}.zip")
+
+    # Ensure the zip file doesn't exist before the test
+    if os.path.exists(expected_zip_path):
+        os.remove(expected_zip_path)
+
+    try:
+        # Run the target function
+        release.create_release_zip()
+
+        # Verify the ZIP file was created in the correct location
+        assert os.path.exists(expected_zip_path), f"Expected ZIP file at {expected_zip_path} was not found"
+
+        # Verify the ZIP file contents
+        with zipfile.ZipFile(expected_zip_path, 'r') as zipf:
+            zip_contents = zipf.namelist()
+            assert "event_viewer.py" in zip_contents
+            assert "LICENSE" in zip_contents
+            assert "README.md" in zip_contents
+            assert len(zip_contents) == 3 # Ensure exactly 3 files are included
+
+    finally:
+        # Teardown: Clean up the generated ZIP file
+        if os.path.exists(expected_zip_path):
+            os.remove(expected_zip_path)
