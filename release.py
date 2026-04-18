@@ -49,3 +49,4 @@ def create_release_zip():
 
 if __name__ == "__main__":
     create_release_zip()
+    input("\n終了するには何かキーを押してください...")
