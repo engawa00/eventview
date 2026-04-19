@@ -148,17 +148,16 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
             (nodes for p in event_paths if (nodes := root.findall(p, ns))), []
         )
 
+        data_paths = (
+            "win:EventData",
+            "{http://schemas.microsoft.com/win/2004/08/events/event}EventData",
+            "EventData",
+        )
         for event in events:
             sleep_time = ""
             wake_time = ""
             wake_reason = ""
             wake_type = ""
-
-            data_paths = (
-                "win:EventData",
-                "{http://schemas.microsoft.com/win/2004/08/events/event}EventData",
-                "EventData",
-            )
             event_data = next(
                 (node for p in data_paths if (node := event.find(p, ns)) is not None),
                 None,
