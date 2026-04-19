@@ -309,3 +309,28 @@ def test_create_release_zip(mock_input):
         # Teardown: Clean up the generated ZIP file
         if os.path.exists(expected_zip_path):
             os.remove(expected_zip_path)
+
+@patch('subprocess.run')
+def test_execute_wevtutil_query_cp932_decode_error_fallback_to_utf8(mock_run):
+    # b'\xc2\x81' is invalid in CP932 but valid in UTF-8
+    mock_result = MagicMock()
+    mock_result.stdout = b"\xc2\x81"
+    mock_result.stderr = b""
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    # We can call the private function directly for testing
+    output = event_viewer._execute_wevtutil_query("*")
+    assert output == b"\xc2\x81".decode("utf-8")
+
+@patch('subprocess.run')
+def test_execute_wevtutil_query_both_decode_error_fallback_to_replace(mock_run):
+    # b'\x81' is invalid in both CP932 and UTF-8
+    mock_result = MagicMock()
+    mock_result.stdout = b"\x81"
+    mock_result.stderr = b""
+    mock_result.returncode = 0
+    mock_run.return_value = mock_result
+
+    output = event_viewer._execute_wevtutil_query("*")
+    assert output == b"\x81".decode("utf-8", errors="replace")
