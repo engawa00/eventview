@@ -1,12 +1,19 @@
 import zipfile
 import os
+import re
 
-def create_release_zip():
+def create_release_zip() -> None:
     print("リリース用ZIPファイルを作成します。")
     version = input("バージョン番号を入力してください (例: 0.2.3): ").strip()
 
     if not version:
         print("エラー: バージョン番号が入力されませんでした。")
+        return
+
+    # セキュリティ対策: バージョン番号のバリデーション (パス・トラバーサル対策)
+    # 英数字、ドット、ハイフンのみを許可する
+    if not re.match(r"^[a-zA-Z0-9.-]+$", version):
+        print("エラー: 不正なバージョン番号です。英数字、ドット(.)、ハイフン(-)のみ使用できます。")
         return
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
