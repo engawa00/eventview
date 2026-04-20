@@ -2,7 +2,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 import argparse
 import datetime
-import sys
 import os
 import calendar
 import tkinter as tk
@@ -97,7 +96,7 @@ def _execute_wevtutil_query(query: str) -> str:
     cmd = [wevtutil_path, "qe", "System", f"/q:{query}", "/f:xml"]
 
     creationflags = 0
-    if sys.platform == "win32":
+    if os.name == "nt":
         creationflags = 0x08000000  # CREATE_NO_WINDOW
 
     try:
