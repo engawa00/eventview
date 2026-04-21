@@ -276,25 +276,26 @@ class CalendarDialog(tk.Toplevel):
         self.cal_frame = ttk.Frame(self)
         self.cal_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    def prev_month(self) -> None:
-        m = self.month_var.get() - 1
+    def add_months(self, delta: int) -> None:
+        m = self.month_var.get() + delta
         y = self.year_var.get()
-        if m < 1:
-            m = 12
+
+        while m < 1:
+            m += 12
             y -= 1
+        while m > 12:
+            m -= 12
+            y += 1
+
         self.month_var.set(m)
         self.year_var.set(y)
         self.update_calendar()
 
+    def prev_month(self) -> None:
+        self.add_months(-1)
+
     def next_month(self) -> None:
-        m = self.month_var.get() + 1
-        y = self.year_var.get()
-        if m > 12:
-            m = 1
-            y += 1
-        self.month_var.set(m)
-        self.year_var.set(y)
-        self.update_calendar()
+        self.add_months(1)
 
     def update_calendar(self) -> None:
         for widget in self.cal_frame.winfo_children():
