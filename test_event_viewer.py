@@ -334,3 +334,15 @@ def test_execute_wevtutil_query_both_decode_error_fallback_to_replace(mock_run):
 
     output = event_viewer._execute_wevtutil_query("*")
     assert output == b"\x81".decode("utf-8", errors="replace")
+
+@patch.dict(os.environ, {"SystemRoot": "D:\\WinNT"}, clear=True)
+def test_get_wevtutil_path_with_systemroot():
+    event_viewer.get_wevtutil_path.cache_clear()
+    expected = os.path.join("D:\\WinNT", "System32", "wevtutil.exe")
+    assert event_viewer.get_wevtutil_path() == expected
+
+@patch.dict(os.environ, {}, clear=True)
+def test_get_wevtutil_path_without_systemroot():
+    event_viewer.get_wevtutil_path.cache_clear()
+    expected = os.path.join("C:\\Windows", "System32", "wevtutil.exe")
+    assert event_viewer.get_wevtutil_path() == expected
