@@ -311,6 +311,16 @@ def test_create_release_zip(mock_input):
             os.remove(expected_zip_path)
 
 @patch('subprocess.run')
+def test_execute_wevtutil_query_permission_error(mock_run):
+    # Simulate a PermissionError when executing the command
+    mock_run.side_effect = PermissionError("Access denied")
+
+    with pytest.raises(RuntimeError) as excinfo:
+        event_viewer._execute_wevtutil_query("*")
+
+    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(excinfo.value)
+
+@patch('subprocess.run')
 def test_execute_wevtutil_query_cp932_decode_error_fallback_to_utf8(mock_run):
     # b'\xc2\x81' is invalid in CP932 but valid in UTF-8
     mock_result = MagicMock()
