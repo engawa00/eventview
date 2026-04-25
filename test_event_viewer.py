@@ -320,6 +320,26 @@ def test_execute_wevtutil_query_permission_error(mock_run):
 
     assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(excinfo.value)
 
+@pytest.mark.parametrize("returncode, stdout, stderr", [
+    (5, b"", b""),
+    (0, b"Access is denied", b""),
+    (0, b"\x83A\x83N\x83Z\x83X\x82\xaa\x8b\x91\x94\xdb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd", b""), # "アクセスが拒否されました" in CP932
+    (0, b"", b"Access is denied"),
+    (0, b"", b"\xe3\x82\xa2\xe3\x82\xaf\xe3\x82\xbb\xe3\x82\xb9\xe3\x81\x8c\xe6\x8b\x92\xe5\x90\xa6\xe3\x81\x95\xe3\x82\x8c\xe3\x81\xbe\xe3\x81\x97\xe3\x81\x9f"), # "アクセスが拒否されました" in UTF-8
+])
+@patch('subprocess.run')
+def test_execute_wevtutil_query_access_denied_logic(mock_run, returncode, stdout, stderr):
+    mock_result = MagicMock()
+    mock_result.returncode = returncode
+    mock_result.stdout = stdout
+    mock_result.stderr = stderr
+    mock_run.return_value = mock_result
+
+    with pytest.raises(RuntimeError) as excinfo:
+        event_viewer._execute_wevtutil_query("*")
+
+    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(excinfo.value)
+
 @patch('subprocess.run')
 def test_execute_wevtutil_query_cp932_decode_error_fallback_to_utf8(mock_run):
     # b'\xc2\x81' is invalid in CP932 but valid in UTF-8
