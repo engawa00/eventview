@@ -303,7 +303,8 @@ def test_create_release_zip(mock_input):
             assert "event_viewer.py" in zip_contents
             assert "LICENSE" in zip_contents
             assert "README.md" in zip_contents
-            assert len(zip_contents) == 3 # Ensure exactly 3 files are included
+            assert "requirements.txt" in zip_contents
+            assert len(zip_contents) == 4 # Ensure exactly 4 files are included
 
     finally:
         # Teardown: Clean up the generated ZIP file

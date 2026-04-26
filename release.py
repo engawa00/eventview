@@ -24,7 +24,8 @@ def create_release_zip() -> None:
     files_to_include = [
         "event_viewer.py",
         "LICENSE",
-        "README.md"
+        "README.md",
+        "requirements.txt"
     ]
 
     # 必須ファイルの存在確認
