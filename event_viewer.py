@@ -157,15 +157,18 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
             "{http://schemas.microsoft.com/win/2004/08/events/event}EventData",
             "EventData",
         )
+        # 効率化のため、ループの外で正しいパスを特定する
+        data_path = next(
+            (p for p in data_paths if events and events[0].find(p, ns) is not None),
+            data_paths[0],
+        )
+
         for event in events:
             sleep_time = ""
             wake_time = ""
             wake_reason = ""
             wake_type = ""
-            event_data = next(
-                (node for p in data_paths if (node := event.find(p, ns)) is not None),
-                None,
-            )
+            event_data = event.find(data_path, ns)
 
             if event_data is not None:
                 # 名前空間あり・なし両方対応できるようにする
