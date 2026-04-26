@@ -1,5 +1,8 @@
 import subprocess
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 import argparse
 import datetime
 import os
