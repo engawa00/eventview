@@ -284,6 +284,17 @@ class CalendarDialog(tk.Toplevel):
         self.cal_frame = ttk.Frame(self)
         self.cal_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
+        days = ["月", "火", "水", "木", "金", "土", "日"]
+        for i, day in enumerate(days):
+            ttk.Label(self.cal_frame, text=day).grid(row=0, column=i, padx=5, pady=2)
+
+        self.date_buttons = []
+        for r in range(1, 7):
+            for c in range(7):
+                btn = ttk.Button(self.cal_frame, width=3)
+                btn.grid(row=r, column=c, padx=1, pady=1)
+                self.date_buttons.append(btn)
+
     def add_months(self, delta: int) -> None:
         m = self.month_var.get() + delta
         y = self.year_var.get()
@@ -306,29 +317,21 @@ class CalendarDialog(tk.Toplevel):
         self.add_months(1)
 
     def update_calendar(self) -> None:
-        for widget in self.cal_frame.winfo_children():
-            widget.destroy()
-
         y = self.year_var.get()
         m = self.month_var.get()
 
         self.month_label.config(text=f"{y}年 {m}月")
 
-        days = ["月", "火", "水", "木", "金", "土", "日"]
-        for i, day in enumerate(days):
-            ttk.Label(self.cal_frame, text=day).grid(row=0, column=i, padx=5, pady=2)
-
         cal = calendar.monthcalendar(y, m)
-        for r, week in enumerate(cal, start=1):
-            for c, day in enumerate(week):
-                if day != 0:
-                    btn = ttk.Button(
-                        self.cal_frame,
-                        text=str(day),
-                        width=3,
-                        command=lambda d=day: self.select_date(y, m, d),
-                    )
-                    btn.grid(row=r, column=c, padx=1, pady=1)
+        flat_cal = [day for week in cal for day in week]
+
+        for i, btn in enumerate(self.date_buttons):
+            if i < len(flat_cal) and flat_cal[i] != 0:
+                day = flat_cal[i]
+                btn.config(text=str(day), command=lambda d=day: self.select_date(y, m, d))
+                btn.grid()
+            else:
+                btn.grid_remove()
 
     def select_date(self, y: int, m: int, d: int) -> None:
         date_str = f"{y:04d}-{m:02d}-{d:02d}"
