@@ -377,3 +377,37 @@ def test_get_wevtutil_path_without_systemroot():
     event_viewer.get_wevtutil_path.cache_clear()
     expected = os.path.join("C:\\Windows", "System32", "wevtutil.exe")
     assert event_viewer.get_wevtutil_path() == expected
+import pytest
+from unittest.mock import MagicMock, patch
+import tkinter as tk
+import event_viewer
+
+@pytest.mark.parametrize("start_y, start_m, delta, expected_y, expected_m", [
+    (2024, 1, 1, 2024, 2),
+    (2024, 1, 12, 2025, 1),
+    (2024, 12, 1, 2025, 1),
+    (2024, 1, -1, 2023, 12),
+    (2024, 1, -12, 2023, 1),
+    (2024, 12, -12, 2023, 12),
+    (2024, 5, 24, 2026, 5),
+    (2024, 5, -24, 2022, 5),
+    (2024, 1, 100, 2032, 5),
+    (2024, 1, -100, 2015, 9),
+])
+def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expected_m):
+    parent = tk.Tk()
+    target_entry = tk.Entry(parent)
+    target_entry.insert(0, f"{start_y}-{start_m:02d}-01")
+
+    with patch('event_viewer.CalendarDialog.create_widgets'),          patch('event_viewer.CalendarDialog.update_calendar'),          patch('tkinter.Toplevel.grab_set'),          patch('tkinter.Toplevel.transient'):
+
+        dialog = event_viewer.CalendarDialog(parent, target_entry)
+        dialog.year_var.set(start_y)
+        dialog.month_var.set(start_m)
+
+        dialog.add_months(delta)
+
+        assert dialog.year_var.get() == expected_y
+        assert dialog.month_var.get() == expected_m
+
+    parent.destroy()
