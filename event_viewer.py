@@ -296,15 +296,9 @@ class CalendarDialog(tk.Toplevel):
                 self.date_buttons.append(btn)
 
     def add_months(self, delta: int) -> None:
-        m = self.month_var.get() + delta
-        y = self.year_var.get()
-
-        while m < 1:
-            m += 12
-            y -= 1
-        while m > 12:
-            m -= 12
-            y += 1
+        total_months = self.month_var.get() + delta - 1
+        y = self.year_var.get() + total_months // 12
+        m = total_months % 12 + 1
 
         self.month_var.set(m)
         self.year_var.set(y)
