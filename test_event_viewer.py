@@ -6,9 +6,7 @@ import os
 
 # Mock tkinter before importing event_viewer to avoid ModuleNotFoundError in environments without tkinter
 try:
-    import tkinter
-    import tkinter.ttk
-    import tkinter.messagebox
+    import tkinter  # noqa: F401
 except ImportError:
     sys.modules['tkinter'] = MagicMock()
     sys.modules['tkinter.ttk'] = MagicMock()
