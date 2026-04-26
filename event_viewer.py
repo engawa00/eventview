@@ -1,4 +1,5 @@
 import subprocess
+
 try:
     import defusedxml.ElementTree as ET
 except ImportError:
@@ -8,6 +9,7 @@ import datetime
 import os
 import calendar
 import tkinter as tk
+import threading
 import functools
 from typing import Optional, List, Dict, Any
 from tkinter import ttk, messagebox
@@ -439,13 +441,20 @@ class WakeEventViewerApp:
         self.fetch_btn.config(state=tk.DISABLED)
         self.root.update()
 
-        try:
-            events = get_wake_events(start_val, end_val)
-        except Exception as e:
-            self.fetch_btn.config(state=tk.NORMAL)
-            messagebox.showerror("エラー", str(e))
-            return
+        def fetch_task() -> None:
+            try:
+                events = get_wake_events(start_val, end_val)
+                self.root.after(0, self._on_fetch_success, events)
+            except Exception as e:
+                self.root.after(0, self._on_fetch_error, e)
 
+        threading.Thread(target=fetch_task, daemon=True).start()
+
+    def _on_fetch_error(self, e: Exception) -> None:
+        self.fetch_btn.config(state=tk.NORMAL)
+        messagebox.showerror("エラー", str(e))
+
+    def _on_fetch_success(self, events: List[Dict[str, str]]) -> None:
         self.fetch_btn.config(state=tk.NORMAL)
 
         if not events:
