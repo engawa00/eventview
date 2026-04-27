@@ -356,19 +356,40 @@ import event_viewer
     (2024, 1, -100, 2015, 9),
 ])
 def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expected_m):
-    parent = tk.Tk()
-    target_entry = tk.Entry(parent)
-    target_entry.insert(0, f"{start_y}-{start_m:02d}-01")
+    parent = MagicMock()
+    target_entry = MagicMock()
+    target_entry.get.return_value = f"{start_y}-{start_m:02d}-01"
 
-    with patch('event_viewer.CalendarDialog.create_widgets'),          patch('event_viewer.CalendarDialog.update_calendar'),          patch('tkinter.Toplevel.grab_set'),          patch('tkinter.Toplevel.transient'):
+    class MockIntVar:
+        def __init__(self, val=0): self.val = val
+        def set(self, val): self.val = val
+        def get(self): return self.val
+
+    y_var = MockIntVar(start_y)
+    m_var = MockIntVar(start_m)
+
+    def intvar_side_effect():
+        if not hasattr(intvar_side_effect, "called"):
+            intvar_side_effect.called = True
+            return y_var
+        return m_var
+
+    with patch("event_viewer.CalendarDialog.create_widgets"), \
+         patch("event_viewer.CalendarDialog.update_calendar"), \
+         patch("tkinter.IntVar", side_effect=intvar_side_effect), \
+         patch("tkinter.Toplevel.__init__", return_value=None), \
+         patch("tkinter.Toplevel.grab_set"), \
+         patch("tkinter.Toplevel.transient"), \
+         patch("tkinter.Toplevel.update_idletasks"), \
+         patch("tkinter.Toplevel.geometry"), \
+         patch("tkinter.Toplevel.title"):
 
         dialog = event_viewer.CalendarDialog(parent, target_entry)
-        dialog.year_var.set(start_y)
-        dialog.month_var.set(start_m)
+        dialog.year_var = y_var
+        dialog.month_var = m_var
 
         dialog.add_months(delta)
 
         assert dialog.year_var.get() == expected_y
         assert dialog.month_var.get() == expected_m
 
-    parent.destroy()
