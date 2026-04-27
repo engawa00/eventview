@@ -241,11 +241,15 @@ def run_cli(start: Optional[str], end: Optional[str]) -> None:
 
 
 class CalendarDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Misc, target_entry: ttk.Entry) -> None:
+    def __init__(
+        self,
+        parent: tk.Misc,
+        target_entry: ttk.Entry,
+        button_widget: Optional[tk.Widget] = None,
+    ) -> None:
         super().__init__(parent)
         self.target_entry = target_entry
         self.title("日付選択")
-        self.geometry("250x250")
         self.transient(parent)
         self.grab_set()
 
@@ -267,6 +271,21 @@ class CalendarDialog(tk.Toplevel):
 
         self.create_widgets()
         self.update_calendar()
+
+        self.update_idletasks()
+        w, h = 250, 250
+
+        ref_widget = button_widget if button_widget else target_entry
+        x = ref_widget.winfo_rootx()
+        y = ref_widget.winfo_rooty() + ref_widget.winfo_height()
+
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+
+        if x + w > sw or y + h > sh or x < 0 or y < 0:
+            x, y = 0, 0
+
+        self.geometry(f"{w}x{h}+{x}+{y}")
 
     def create_widgets(self) -> None:
         header_frame = ttk.Frame(self)
@@ -351,24 +370,30 @@ class WakeEventViewerApp:
         )
         self.start_entry = ttk.Entry(self.input_frame, width=12)
         self.start_entry.pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(
+        self.start_cal_btn = ttk.Button(
             self.input_frame,
             text="📅",
             width=3,
-            command=lambda: CalendarDialog(self.root, self.start_entry),
-        ).pack(side=tk.LEFT, padx=(0, 15))
+            command=lambda: CalendarDialog(
+                self.root, self.start_entry, self.start_cal_btn
+            ),
+        )
+        self.start_cal_btn.pack(side=tk.LEFT, padx=(0, 15))
 
         ttk.Label(self.input_frame, text="終了日 (YYYY-MM-DD):").pack(
             side=tk.LEFT, padx=(0, 5)
         )
         self.end_entry = ttk.Entry(self.input_frame, width=12)
         self.end_entry.pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(
+        self.end_cal_btn = ttk.Button(
             self.input_frame,
             text="📅",
             width=3,
-            command=lambda: CalendarDialog(self.root, self.end_entry),
-        ).pack(side=tk.LEFT, padx=(0, 15))
+            command=lambda: CalendarDialog(
+                self.root, self.end_entry, self.end_cal_btn
+            ),
+        )
+        self.end_cal_btn.pack(side=tk.LEFT, padx=(0, 15))
 
         self.fetch_btn = ttk.Button(
             self.input_frame, text="検索", command=self.fetch_data
