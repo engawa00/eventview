@@ -43,26 +43,21 @@ def parse_utc_to_local(utc_str: str) -> str:
         return ""
 
     if len(utc_str) >= 20 and utc_str[-1] == "Z" and utc_str[10] == "T":
+        parsed_str = utc_str
         if "." in utc_str:
+            base, frac = utc_str[:-1].split(".", 1)
+            frac = frac[:6]
+            parsed_str = f"{base}.{frac}Z"
+
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
             try:
-                base, frac = utc_str[:-1].split(".", 1)
-                frac = frac[:6]
-                dt_utc = datetime.datetime.strptime(
-                    f"{base}.{frac}Z", "%Y-%m-%dT%H:%M:%S.%fZ"
-                ).replace(tzinfo=datetime.timezone.utc)
+                dt_utc = datetime.datetime.strptime(parsed_str, fmt).replace(
+                    tzinfo=datetime.timezone.utc
+                )
                 dt_local = dt_utc.astimezone()
                 return dt_local.strftime("%Y-%m-%d %H:%M:%S")
             except ValueError:
-                pass
-        else:
-            try:
-                dt_utc = datetime.datetime.strptime(
-                    utc_str, "%Y-%m-%dT%H:%M:%SZ"
-                ).replace(tzinfo=datetime.timezone.utc)
-                dt_local = dt_utc.astimezone()
-                return dt_local.strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                pass
+                continue
 
     return utc_str
 
@@ -241,7 +236,12 @@ def run_cli(start: Optional[str], end: Optional[str]) -> None:
 
 
 class CalendarDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Misc, target_entry: ttk.Entry, trigger_widget: Optional[tk.Widget] = None) -> None:
+    def __init__(
+        self,
+        parent: tk.Misc,
+        target_entry: ttk.Entry,
+        trigger_widget: Optional[tk.Widget] = None,
+    ) -> None:
         super().__init__(parent)
         self.target_entry = target_entry
         self.title("日付選択")
@@ -339,7 +339,9 @@ class CalendarDialog(tk.Toplevel):
         for i, btn in enumerate(self.date_buttons):
             if i < len(flat_cal) and flat_cal[i] != 0:
                 day = flat_cal[i]
-                btn.config(text=str(day), command=lambda d=day: self.select_date(y, m, d))
+                btn.config(
+                    text=str(day), command=lambda d=day: self.select_date(y, m, d)
+                )
                 btn.grid()
             else:
                 btn.grid_remove()
@@ -373,7 +375,11 @@ class WakeEventViewerApp:
             text="📅",
             width=3,
         )
-        self.cal_btn_start.config(command=lambda: CalendarDialog(self.root, self.start_entry, self.cal_btn_start))
+        self.cal_btn_start.config(
+            command=lambda: CalendarDialog(
+                self.root, self.start_entry, self.cal_btn_start
+            )
+        )
         self.cal_btn_start.pack(side=tk.LEFT, padx=(0, 15))
 
         ttk.Label(self.input_frame, text="終了日 (YYYY-MM-DD):").pack(
@@ -386,7 +392,9 @@ class WakeEventViewerApp:
             text="📅",
             width=3,
         )
-        self.cal_btn_end.config(command=lambda: CalendarDialog(self.root, self.end_entry, self.cal_btn_end))
+        self.cal_btn_end.config(
+            command=lambda: CalendarDialog(self.root, self.end_entry, self.cal_btn_end)
+        )
         self.cal_btn_end.pack(side=tk.LEFT, padx=(0, 15))
 
         self.fetch_btn = ttk.Button(
