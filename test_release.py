@@ -58,13 +58,50 @@ def test_create_release_zip_invalid_version(mock_print, mock_input):
     zip_files_after = [f for f in os.listdir(script_dir) if f.endswith(".zip")]
     assert len(zip_files_before) == len(zip_files_after)
 
+@pytest.mark.parametrize("empty_val", ["", "   ", "\t", "\n"])
 @patch('builtins.input')
 @patch('builtins.print')
-def test_create_release_zip_empty_version(mock_print, mock_input):
+def test_create_release_zip_empty_version(mock_print, mock_input, empty_val):
     # Empty string should be handled
-    mock_input.return_value = ""
+    mock_input.return_value = empty_val
 
     release.create_release_zip()
 
     # Check for error message
     mock_print.assert_any_call("エラー: バージョン番号が入力されませんでした。")
+
+
+@patch('builtins.input')
+@patch('builtins.print')
+@patch('os.path.exists')
+def test_create_release_zip_missing_files(mock_exists, mock_print, mock_input):
+    mock_input.return_value = "0.0.1"
+
+    # Mock os.path.exists to return False for 'LICENSE' to trigger missing files error
+    def exists_side_effect(path):
+        if 'LICENSE' in path:
+            return False
+        return True
+
+    mock_exists.side_effect = exists_side_effect
+
+    release.create_release_zip()
+
+    # Check for error message
+    mock_print.assert_any_call("エラー: 以下の必須ファイルが見つかりません: LICENSE")
+    mock_print.assert_any_call("リリース用ZIPの作成を中止します。")
+
+
+@patch('builtins.input')
+@patch('builtins.print')
+@patch('zipfile.ZipFile')
+def test_create_release_zip_exception(mock_zipfile, mock_print, mock_input):
+    mock_input.return_value = "0.0.1"
+
+    # Force an exception when creating the zip file
+    mock_zipfile.side_effect = Exception("Test Exception")
+
+    release.create_release_zip()
+
+    # Check for error message
+    mock_print.assert_any_call("\nエラー: ZIPファイルの作成中にエラーが発生しました: Test Exception")
