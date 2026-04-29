@@ -382,7 +382,9 @@ def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expecte
          patch("tkinter.Toplevel.transient"), \
          patch("tkinter.Toplevel.update_idletasks"), \
          patch("tkinter.Toplevel.geometry"), \
-         patch("tkinter.Toplevel.title"):
+         patch("tkinter.Toplevel.title"), \
+         patch("tkinter.Toplevel.withdraw"), \
+         patch("tkinter.Toplevel.deiconify"):
 
         dialog = event_viewer.CalendarDialog(parent, target_entry)
         dialog.year_var = y_var

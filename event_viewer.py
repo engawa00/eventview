@@ -245,6 +245,7 @@ class CalendarDialog(tk.Toplevel):
         super().__init__(parent)
         self.target_entry = target_entry
         self.title("日付選択")
+        self.withdraw()
 
         self.update_idletasks()
         w, h = 250, 250
@@ -282,6 +283,7 @@ class CalendarDialog(tk.Toplevel):
 
         self.create_widgets()
         self.update_calendar()
+        self.deiconify()
 
     def create_widgets(self) -> None:
         header_frame = ttk.Frame(self)
