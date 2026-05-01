@@ -409,3 +409,23 @@ def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expecte
 ])
 def test_validate_date(date_str, expected):
     assert event_viewer.validate_date(date_str) is expected
+
+@patch('event_viewer.local_to_utc_str')
+def test_build_wevtutil_query(mock_local_to_utc_str):
+    mock_local_to_utc_str.side_effect = lambda d, is_end_of_day=False: f"{d}T{'23:59:59' if is_end_of_day else '00:00:00'}Z"
+
+    # Both None
+    q = event_viewer._build_wevtutil_query()
+    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)]]"
+
+    # Only start
+    q = event_viewer._build_wevtutil_query(start_date="2024-01-01")
+    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z']]]"
+
+    # Only end
+    q = event_viewer._build_wevtutil_query(end_date="2024-01-02")
+    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime<='2024-01-02T23:59:59Z']]]"
+
+    # Both
+    q = event_viewer._build_wevtutil_query(start_date="2024-01-01", end_date="2024-01-02")
+    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
