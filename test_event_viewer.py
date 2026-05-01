@@ -395,3 +395,17 @@ def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expecte
         assert dialog.year_var.get() == expected_y
         assert dialog.month_var.get() == expected_m
 
+
+@pytest.mark.parametrize("date_str, expected", [
+    ("2024-01-01", True),
+    ("2024-02-29", True),
+    ("2023-02-29", False),
+    ("2024-13-01", False),
+    ("01-01-2024", False),
+    ("2024/01/01", False),
+    ("not-a-date", False),
+    ("", True),
+    (None, True),
+])
+def test_validate_date(date_str, expected):
+    assert event_viewer.validate_date(date_str) is expected
