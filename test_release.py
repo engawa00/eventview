@@ -105,3 +105,24 @@ def test_create_release_zip_exception(mock_zipfile, mock_print, mock_input):
 
     # Check for error message
     mock_print.assert_any_call("\nエラー: ZIPファイルの作成中にエラーが発生しました: Test Exception")
+
+
+@patch('builtins.input')
+@patch('builtins.print')
+@patch('os.path.exists')
+def test_create_release_zip_multiple_missing_files(mock_exists, mock_print, mock_input):
+    mock_input.return_value = "0.0.1"
+
+    # Mock os.path.exists to return False for both 'LICENSE' and 'README.md'
+    def exists_side_effect(path):
+        if 'LICENSE' in path or 'README.md' in path:
+            return False
+        return True
+
+    mock_exists.side_effect = exists_side_effect
+
+    release.create_release_zip()
+
+    # Check for error message that includes both missing files
+    mock_print.assert_any_call("エラー: 以下の必須ファイルが見つかりません: LICENSE, README.md")
+    mock_print.assert_any_call("リリース用ZIPの作成を中止します。")
