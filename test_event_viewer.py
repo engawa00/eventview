@@ -429,3 +429,50 @@ def test_build_wevtutil_query(mock_local_to_utc_str):
     # Both
     q = event_viewer._build_wevtutil_query(start_date="2024-01-01", end_date="2024-01-02")
     assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
+
+def test_parse_wake_events_xml_empty():
+    """Test _parse_wake_events_xml with empty or whitespace-only strings."""
+    assert event_viewer._parse_wake_events_xml("") == []
+    assert event_viewer._parse_wake_events_xml("   \n  ") == []
+
+def test_parse_wake_events_xml_invalid():
+    """Test _parse_wake_events_xml with invalid XML to ensure it raises RuntimeError."""
+    with pytest.raises(RuntimeError, match="Failed to parse XML"):
+        event_viewer._parse_wake_events_xml("<invalid>")
+
+@patch('event_viewer.parse_utc_to_local')
+def test_parse_wake_events_xml_valid(mock_parse):
+    """Test _parse_wake_events_xml with valid XML output containing actual values."""
+    mock_parse.side_effect = lambda x: f"LOCAL_{x}"
+    xml_data = """
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <EventData>
+            <Data Name="SleepTime">2024-01-01T00:00:00Z</Data>
+            <Data Name="WakeTime">2024-01-01T08:00:00Z</Data>
+            <Data Name="WakeSourceText">Test Reason</Data>
+            <Data Name="WakeSourceType">0</Data>
+        </EventData>
+    </Event>
+    """
+    res = event_viewer._parse_wake_events_xml(xml_data)
+    assert len(res) == 1
+    assert res[0]["SleepTime"] == "LOCAL_2024-01-01T00:00:00Z"
+    assert res[0]["WakeTime"] == "LOCAL_2024-01-01T08:00:00Z"
+    assert res[0]["Reason"] == "Test Reason"
+
+def test_parse_wake_events_xml_wake_type_fallbacks():
+    """Test _parse_wake_events_xml fallback logic when WakeSourceText is empty."""
+    def get_xml(wake_type):
+        return f"""
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <EventData>
+                <Data Name="WakeSourceType">{wake_type}</Data>
+            </EventData>
+        </Event>
+        """
+
+    assert event_viewer._parse_wake_events_xml(get_xml("0"))[0]["Reason"] == "不明 (Unknown)"
+    assert event_viewer._parse_wake_events_xml(get_xml("1"))[0]["Reason"] == "電源ボタン (Power Button)"
+    assert event_viewer._parse_wake_events_xml(get_xml("8"))[0]["Reason"] == "デバイス または API (Device / API)"
+    assert event_viewer._parse_wake_events_xml(get_xml("99"))[0]["Reason"] == "Type 99"
+    assert event_viewer._parse_wake_events_xml(get_xml(""))[0]["Reason"] == "不明"
