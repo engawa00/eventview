@@ -42,22 +42,21 @@ def parse_utc_to_local(utc_str: str) -> str:
     if not utc_str:
         return ""
 
+    parsed_str = utc_str
     if len(utc_str) >= 20 and utc_str[-1] == "Z" and utc_str[10] == "T":
-        parsed_str = utc_str
         if "." in utc_str:
             base, frac = utc_str[:-1].split(".", 1)
-            frac = frac[:6]
-            parsed_str = f"{base}.{frac}Z"
+            parsed_str = f"{base}.{frac[:6]}Z"
 
-        for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
-            try:
-                dt_utc = datetime.datetime.strptime(parsed_str, fmt).replace(
-                    tzinfo=datetime.timezone.utc
-                )
-                dt_local = dt_utc.astimezone()
-                return dt_local.strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                continue
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            dt_utc = datetime.datetime.strptime(parsed_str, fmt).replace(
+                tzinfo=datetime.timezone.utc
+            )
+            dt_local = dt_utc.astimezone()
+            return dt_local.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
 
     return utc_str
 
