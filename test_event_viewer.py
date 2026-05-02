@@ -476,3 +476,22 @@ def test_parse_wake_events_xml_wake_type_fallbacks():
     assert event_viewer._parse_wake_events_xml(get_xml("8"))[0]["Reason"] == "デバイス または API (Device / API)"
     assert event_viewer._parse_wake_events_xml(get_xml("99"))[0]["Reason"] == "Type 99"
     assert event_viewer._parse_wake_events_xml(get_xml(""))[0]["Reason"] == "不明"
+
+@patch('event_viewer.WakeEventViewerApp')
+@patch('event_viewer.tk.Tk')
+def test_run_gui(mock_tk_class, mock_app_class):
+    # Setup mock root instance returned by tk.Tk()
+    mock_root_instance = MagicMock()
+    mock_tk_class.return_value = mock_root_instance
+
+    # Call the target function
+    event_viewer.run_gui()
+
+    # Verify tk.Tk() was called to create the root window
+    mock_tk_class.assert_called_once()
+
+    # Verify WakeEventViewerApp was instantiated with the root window
+    mock_app_class.assert_called_once_with(mock_root_instance)
+
+    # Verify mainloop was called on the root window to start the GUI
+    mock_root_instance.mainloop.assert_called_once()
