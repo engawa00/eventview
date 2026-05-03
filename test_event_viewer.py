@@ -495,3 +495,51 @@ def test_run_gui(mock_tk_class, mock_app_class):
 
     # Verify mainloop was called on the root window to start the GUI
     mock_root_instance.mainloop.assert_called_once()
+
+@patch("event_viewer.messagebox")
+def test_on_fetch_error_direct(mock_msgbox):
+    app = MagicMock()
+    err_msg = "Test error"
+
+    # Call the method directly on the class with a mock instance
+    event_viewer.WakeEventViewerApp._on_fetch_error(app, err_msg)
+
+    app.btn_fetch.config.assert_called_with(state="normal")
+    app.status_var.set.assert_called_with("取得失敗")
+    mock_msgbox.showerror.assert_called_with(
+        "エラー", f"イベントの取得に失敗しました:\n{err_msg}"
+    )
+
+
+@patch("event_viewer.messagebox")
+def test_on_fetch_success_no_events_direct(mock_msgbox):
+    app = MagicMock()
+
+    event_viewer.WakeEventViewerApp._on_fetch_success(app, [])
+
+    app.btn_fetch.config.assert_called_with(state=event_viewer.tk.NORMAL)
+    app.status_var.set.assert_called_with("取得完了")
+    mock_msgbox.showinfo.assert_called_with(
+        "結果", "指定された期間の復帰イベントは見つかりませんでした。"
+    )
+
+
+def test_on_fetch_success_with_events_direct():
+    app = MagicMock()
+    events = [
+        {
+            "SleepTime": "2024-01-01 10:00:00",
+            "WakeTime": "2024-01-01 11:00:00",
+            "Reason": "Button",
+        },
+    ]
+
+    event_viewer.WakeEventViewerApp._on_fetch_success(app, events)
+
+    app.btn_fetch.config.assert_called_with(state=event_viewer.tk.NORMAL)
+    app.status_var.set.assert_called_with("取得完了")
+    app.tree.insert.assert_called_with(
+        "",
+        event_viewer.tk.END,
+        values=("2024-01-01 10:00:00", "2024-01-01 11:00:00", "Button"),
+    )
