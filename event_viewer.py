@@ -14,6 +14,8 @@ import functools
 from typing import Optional, List, Dict, Any
 from tkinter import ttk, messagebox
 
+UTC_FORMATS = ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ")
+
 
 def local_to_utc_str(date_str: str, is_end_of_day: bool = False) -> str:
 
@@ -48,7 +50,7 @@ def parse_utc_to_local(utc_str: str) -> str:
             base, frac = utc_str[:-1].split(".", 1)
             parsed_str = f"{base}.{frac[:6]}Z"
 
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
+    for fmt in UTC_FORMATS:
         try:
             dt_utc = datetime.datetime.strptime(parsed_str, fmt).replace(
                 tzinfo=datetime.timezone.utc
