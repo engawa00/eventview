@@ -396,10 +396,14 @@ class WakeEventViewerApp:
         )
         self.cal_btn_end.pack(side=tk.LEFT, padx=(0, 15))
 
-        self.fetch_btn = ttk.Button(
+        self.btn_fetch = ttk.Button(
             self.input_frame, text="検索", command=self.fetch_data
         )
-        self.fetch_btn.pack(side=tk.LEFT)
+        self.btn_fetch.pack(side=tk.LEFT)
+
+        self.status_var = tk.StringVar(value="準備完了")
+        self.status_label = ttk.Label(self.input_frame, textvariable=self.status_var)
+        self.status_label.pack(side=tk.LEFT, padx=(10, 0))
 
         self.paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
         self.paned.pack(fill=tk.BOTH, expand=True)
@@ -464,7 +468,8 @@ class WakeEventViewerApp:
             )
             return
 
-        self.fetch_btn.config(state=tk.DISABLED)
+        self.btn_fetch.config(state=tk.DISABLED)
+        self.status_var.set("取得中...")
         self.root.update()
 
         def fetch_task() -> None:
@@ -472,16 +477,18 @@ class WakeEventViewerApp:
                 events = get_wake_events(start_val, end_val)
                 self.root.after(0, self._on_fetch_success, events)
             except Exception as e:
-                self.root.after(0, self._on_fetch_error, e)
+                self.root.after(0, self._on_fetch_error, str(e))
 
         threading.Thread(target=fetch_task, daemon=True).start()
 
-    def _on_fetch_error(self, e: Exception) -> None:
-        self.fetch_btn.config(state=tk.NORMAL)
-        messagebox.showerror("エラー", str(e))
+    def _on_fetch_error(self, err_msg: str) -> None:
+        messagebox.showerror("エラー", f"イベントの取得に失敗しました:\n{err_msg}")
+        self.btn_fetch.config(state="normal")
+        self.status_var.set("取得失敗")
 
     def _on_fetch_success(self, events: List[Dict[str, str]]) -> None:
-        self.fetch_btn.config(state=tk.NORMAL)
+        self.btn_fetch.config(state=tk.NORMAL)
+        self.status_var.set("取得完了")
 
         if not events:
             messagebox.showinfo(
