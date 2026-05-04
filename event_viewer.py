@@ -127,6 +127,50 @@ def _execute_wevtutil_query(query: str) -> str:
     return xml_output
 
 
+def _map_wake_reason(wake_reason: str, wake_type: str) -> str:
+    if wake_reason:
+        return wake_reason
+    if wake_type == "0":
+        return "不明 (Unknown)"
+    elif wake_type == "1":
+        return "電源ボタン (Power Button)"
+    elif wake_type == "8":
+        return "デバイス または API (Device / API)"
+    elif wake_type:
+        return f"Type {wake_type}"
+    return "不明"
+
+
+def _parse_single_event(
+    event: Any, data_path: str, ns: Dict[str, str]
+) -> Dict[str, str]:
+    sleep_time = ""
+    wake_time = ""
+    wake_reason = ""
+    wake_type = ""
+    event_data = event.find(data_path, ns)
+
+    if event_data is not None:
+        # 名前空間あり・なし両方対応できるようにする
+        for data in event_data:
+            name = data.get("Name")
+            text = data.text or ""
+            if name == "SleepTime":
+                sleep_time = text
+            elif name == "WakeTime":
+                wake_time = text
+            elif name == "WakeSourceText":
+                wake_reason = text
+            elif name == "WakeSourceType":
+                wake_type = text
+
+    return {
+        "SleepTime": parse_utc_to_local(sleep_time),
+        "WakeTime": parse_utc_to_local(wake_time),
+        "Reason": _map_wake_reason(wake_reason, wake_type),
+    }
+
+
 def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
     if not xml_output.strip():
         return []
@@ -160,45 +204,7 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
         )
 
         for event in events:
-            sleep_time = ""
-            wake_time = ""
-            wake_reason = ""
-            wake_type = ""
-            event_data = event.find(data_path, ns)
-
-            if event_data is not None:
-                # 名前空間あり・なし両方対応できるようにする
-                for data in event_data:
-                    name = data.get("Name")
-                    text = data.text or ""
-                    if name == "SleepTime":
-                        sleep_time = text
-                    elif name == "WakeTime":
-                        wake_time = text
-                    elif name == "WakeSourceText":
-                        wake_reason = text
-                    elif name == "WakeSourceType":
-                        wake_type = text
-
-            if not wake_reason:
-                if wake_type == "0":
-                    wake_reason = "不明 (Unknown)"
-                elif wake_type == "1":
-                    wake_reason = "電源ボタン (Power Button)"
-                elif wake_type == "8":
-                    wake_reason = "デバイス または API (Device / API)"
-                elif wake_type:
-                    wake_reason = f"Type {wake_type}"
-                else:
-                    wake_reason = "不明"
-
-            events_data.append(
-                {
-                    "SleepTime": parse_utc_to_local(sleep_time),
-                    "WakeTime": parse_utc_to_local(wake_time),
-                    "Reason": wake_reason,
-                }
-            )
+            events_data.append(_parse_single_event(event, data_path, ns))
 
     except ET.ParseError as e:
         raise RuntimeError(f"Failed to parse XML: {e}")
