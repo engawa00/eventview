@@ -592,3 +592,38 @@ def test_on_fetch_success_with_events_direct():
         event_viewer.tk.END,
         values=("2024-01-01 10:00:00", "2024-01-01 11:00:00", "Button"),
     )
+
+def test_calendar_dialog_select_date():
+    target_entry = MagicMock()
+    target_entry.get.return_value = "2024-01-01"
+
+    with patch("event_viewer.CalendarDialog.create_widgets"), \
+         patch("event_viewer.CalendarDialog.update_calendar"), \
+         patch("tkinter.IntVar", MagicMock()), \
+         patch("tkinter.Toplevel.__init__", return_value=None), \
+         patch("tkinter.Toplevel.title"), \
+         patch("tkinter.Toplevel.update_idletasks"), \
+         patch("tkinter.Toplevel.winfo_rootx", return_value=0), \
+         patch("tkinter.Toplevel.winfo_rooty", return_value=0), \
+         patch("tkinter.Toplevel.winfo_height", return_value=0), \
+         patch("tkinter.Toplevel.winfo_screenwidth", return_value=1000), \
+         patch("tkinter.Toplevel.winfo_screenheight", return_value=1000), \
+         patch("tkinter.Toplevel.winfo_reqwidth", return_value=100), \
+         patch("tkinter.Toplevel.winfo_reqheight", return_value=100), \
+         patch("tkinter.Toplevel.geometry"), \
+         patch("tkinter.Toplevel.attributes"), \
+         patch("tkinter.Toplevel.transient"), \
+         patch("tkinter.Toplevel.grab_set"), \
+         patch("tkinter.Toplevel.focus_set"), \
+         patch("tkinter.Toplevel.wait_window"), \
+         patch("tkinter.Toplevel.withdraw"), \
+         patch("tkinter.Toplevel.deiconify"):
+
+        dialog = event_viewer.CalendarDialog(MagicMock(), target_entry)
+        dialog.destroy = MagicMock()
+
+        dialog.select_date(2024, 5, 4)
+
+        target_entry.delete.assert_called_once_with(0, event_viewer.tk.END)
+        target_entry.insert.assert_called_once_with(0, "2024-05-04")
+        dialog.destroy.assert_called_once()
