@@ -8,6 +8,7 @@ import argparse
 import datetime
 import os
 import calendar
+import itertools
 import tkinter as tk
 import threading
 import functools
@@ -341,11 +342,13 @@ class CalendarDialog(tk.Toplevel):
         self.month_label.config(text=f"{y}年 {m}月")
 
         cal = calendar.monthcalendar(y, m)
-        flat_cal = [day for week in cal for day in week]
 
-        for i, btn in enumerate(self.date_buttons):
-            if i < len(flat_cal) and flat_cal[i] != 0:
-                day = flat_cal[i]
+        for btn, day in itertools.zip_longest(
+            self.date_buttons,
+            itertools.chain.from_iterable(cal),
+            fillvalue=0,
+        ):
+            if day != 0:
                 btn.config(
                     text=str(day), command=lambda d=day: self.select_date(y, m, d)
                 )
