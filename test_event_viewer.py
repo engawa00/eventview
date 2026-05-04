@@ -396,6 +396,55 @@ def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expecte
         assert dialog.month_var.get() == expected_m
 
 
+def test_calendar_dialog_prev_month():
+    parent = MagicMock()
+    target_entry = MagicMock()
+    target_entry.get.return_value = "2024-01-01"
+
+    with patch("event_viewer.CalendarDialog.create_widgets"), \
+         patch("event_viewer.CalendarDialog.update_calendar"), \
+         patch("tkinter.IntVar", MagicMock()), \
+         patch("tkinter.Toplevel.__init__", return_value=None), \
+         patch("tkinter.Toplevel.grab_set"), \
+         patch("tkinter.Toplevel.transient"), \
+         patch("tkinter.Toplevel.update_idletasks"), \
+         patch("tkinter.Toplevel.geometry"), \
+         patch("tkinter.Toplevel.title"), \
+         patch("tkinter.Toplevel.withdraw"), \
+         patch("tkinter.Toplevel.deiconify"):
+
+        dialog = event_viewer.CalendarDialog(parent, target_entry)
+        dialog.add_months = MagicMock()
+
+        dialog.prev_month()
+
+        dialog.add_months.assert_called_once_with(-1)
+
+
+def test_calendar_dialog_next_month():
+    parent = MagicMock()
+    target_entry = MagicMock()
+    target_entry.get.return_value = "2024-01-01"
+
+    with patch("event_viewer.CalendarDialog.create_widgets"), \
+         patch("event_viewer.CalendarDialog.update_calendar"), \
+         patch("tkinter.IntVar", MagicMock()), \
+         patch("tkinter.Toplevel.__init__", return_value=None), \
+         patch("tkinter.Toplevel.grab_set"), \
+         patch("tkinter.Toplevel.transient"), \
+         patch("tkinter.Toplevel.update_idletasks"), \
+         patch("tkinter.Toplevel.geometry"), \
+         patch("tkinter.Toplevel.title"), \
+         patch("tkinter.Toplevel.withdraw"), \
+         patch("tkinter.Toplevel.deiconify"):
+
+        dialog = event_viewer.CalendarDialog(parent, target_entry)
+        dialog.add_months = MagicMock()
+
+        dialog.next_month()
+
+        dialog.add_months.assert_called_once_with(1)
+
 @pytest.mark.parametrize("date_str, expected", [
     ("2024-01-01", True),
     ("2024-02-29", True),
