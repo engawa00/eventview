@@ -592,3 +592,19 @@ def test_on_fetch_success_with_events_direct():
         event_viewer.tk.END,
         values=("2024-01-01 10:00:00", "2024-01-01 11:00:00", "Button"),
     )
+
+
+
+def test_calendar_dialog_select_date():
+    target_entry = MagicMock()
+    target_entry.get.return_value = "2024-01-01"
+
+    # Call unbound method to avoid patching a million UI things
+    dialog = MagicMock()
+    dialog.target_entry = target_entry
+
+    event_viewer.CalendarDialog.select_date(dialog, 2024, 5, 4)
+
+    target_entry.delete.assert_called_once_with(0, event_viewer.tk.END)
+    target_entry.insert.assert_called_once_with(0, "2024-05-04")
+    dialog.destroy.assert_called_once()
