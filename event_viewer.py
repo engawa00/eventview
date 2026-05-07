@@ -483,14 +483,14 @@ class WakeEventViewerApp:
         self.status_var.set("取得中...")
         self.root.update()
 
-        def fetch_task() -> None:
-            try:
-                events = get_wake_events(start_val, end_val)
-                self.root.after(0, self._on_fetch_success, events)
-            except Exception as e:
-                self.root.after(0, self._on_fetch_error, str(e))
+        threading.Thread(target=self.fetch_task, args=(start_val, end_val), daemon=True).start()
 
-        threading.Thread(target=fetch_task, daemon=True).start()
+    def fetch_task(self, start: Optional[str], end: Optional[str]) -> None:
+        try:
+            events = get_wake_events(start, end)
+            self.root.after(0, self._on_fetch_success, events)
+        except Exception as e:
+            self.root.after(0, self._on_fetch_error, str(e))
 
     def _on_fetch_error(self, err_msg: str) -> None:
         messagebox.showerror("エラー", f"イベントの取得に失敗しました:\n{err_msg}")
