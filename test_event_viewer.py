@@ -608,3 +608,24 @@ def test_calendar_dialog_select_date():
     target_entry.delete.assert_called_once_with(0, event_viewer.tk.END)
     target_entry.insert.assert_called_once_with(0, "2024-05-04")
     dialog.destroy.assert_called_once()
+
+@patch("event_viewer.get_wake_events")
+def test_fetch_task_success(mock_get_events):
+    app = MagicMock()
+    mock_events = [{"some": "event"}]
+    mock_get_events.return_value = mock_events
+
+    event_viewer.WakeEventViewerApp.fetch_task(app, "2024-01-01", "2024-01-02")
+
+    mock_get_events.assert_called_once_with("2024-01-01", "2024-01-02")
+    app.root.after.assert_called_once_with(0, app._on_fetch_success, mock_events)
+
+@patch("event_viewer.get_wake_events")
+def test_fetch_task_error(mock_get_events):
+    app = MagicMock()
+    mock_get_events.side_effect = Exception("test error")
+
+    event_viewer.WakeEventViewerApp.fetch_task(app, "2024-01-01", "2024-01-02")
+
+    mock_get_events.assert_called_once_with("2024-01-01", "2024-01-02")
+    app.root.after.assert_called_once_with(0, app._on_fetch_error, "test error")
