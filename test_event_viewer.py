@@ -629,3 +629,42 @@ def test_fetch_task_error(mock_get_events):
 
     mock_get_events.assert_called_once_with("2024-01-01", "2024-01-02")
     app.root.after.assert_called_once_with(0, app._on_fetch_error, "test error")
+
+def test_on_tree_select_no_selection():
+    app = MagicMock()
+    app.tree.selection.return_value = ()
+
+    event_viewer.WakeEventViewerApp.on_tree_select(app, None)
+
+    # Verify it clears and disables the text box, even when no item is selected
+    app.details_text.delete.assert_called_once_with(1.0, event_viewer.tk.END)
+    app.details_text.insert.assert_not_called()
+    app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
+
+def test_on_tree_select_with_selection_and_reason():
+    app = MagicMock()
+    app.tree.selection.return_value = ("item1",)
+
+    mock_item = {"values": ["time1", "time2", "Detailed Reason"]}
+    app.tree.item.return_value = mock_item
+
+    event_viewer.WakeEventViewerApp.on_tree_select(app, None)
+
+    app.tree.item.assert_called_once_with("item1")
+    app.details_text.delete.assert_called_once_with(1.0, event_viewer.tk.END)
+    app.details_text.insert.assert_called_once_with(event_viewer.tk.END, "Detailed Reason")
+    app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
+
+def test_on_tree_select_with_selection_no_reason():
+    app = MagicMock()
+    app.tree.selection.return_value = ("item1",)
+
+    mock_item = {"values": ["time1", "time2"]}
+    app.tree.item.return_value = mock_item
+
+    event_viewer.WakeEventViewerApp.on_tree_select(app, None)
+
+    app.tree.item.assert_called_once_with("item1")
+    app.details_text.delete.assert_called_once_with(1.0, event_viewer.tk.END)
+    app.details_text.insert.assert_called_once_with(event_viewer.tk.END, "")
+    app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
