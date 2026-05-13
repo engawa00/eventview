@@ -340,7 +340,6 @@ def test_get_wevtutil_path_without_systemroot():
     assert event_viewer.get_wevtutil_path() == expected
 import pytest
 from unittest.mock import MagicMock, patch
-import tkinter as tk
 import event_viewer
 
 @pytest.mark.parametrize("start_y, start_m, delta, expected_y, expected_m", [
