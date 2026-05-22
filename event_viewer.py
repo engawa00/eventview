@@ -364,11 +364,12 @@ class CalendarDialog(tk.Toplevel):
         ):
             if day != 0:
                 btn.config(
-                    text=str(day), command=lambda d=day: self.select_date(y, m, d)
+                    text=str(day),
+                    command=lambda d=day: self.select_date(y, m, d),
+                    state=tk.NORMAL
                 )
-                btn.grid()
             else:
-                btn.grid_remove()
+                btn.config(text="", state=tk.DISABLED)
 
     def select_date(self, y: int, m: int, d: int) -> None:
         date_str = f"{y:04d}-{m:02d}-{d:02d}"
