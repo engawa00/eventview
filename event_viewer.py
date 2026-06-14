@@ -159,30 +159,25 @@ def _map_wake_reason(wake_reason: str, wake_type: str) -> str:
 def _parse_single_event(
     event: Any, data_path: str, ns: Dict[str, str]
 ) -> Dict[str, str]:
-    sleep_time = ""
-    wake_time = ""
-    wake_reason = ""
-    wake_type = ""
+    parsed = {
+        "SleepTime": "",
+        "WakeTime": "",
+        "WakeSourceText": "",
+        "WakeSourceType": "",
+    }
     event_data = event.find(data_path, ns)
 
     if event_data is not None:
         # 名前空間あり・なし両方対応できるようにする
         for data in event_data:
             name = data.get("Name")
-            text = data.text or ""
-            if name == "SleepTime":
-                sleep_time = text
-            elif name == "WakeTime":
-                wake_time = text
-            elif name == "WakeSourceText":
-                wake_reason = text
-            elif name == "WakeSourceType":
-                wake_type = text
+            if name in parsed:
+                parsed[name] = data.text or ""
 
     return {
-        "SleepTime": parse_utc_to_local(sleep_time),
-        "WakeTime": parse_utc_to_local(wake_time),
-        "Reason": _map_wake_reason(wake_reason, wake_type),
+        "SleepTime": parse_utc_to_local(parsed["SleepTime"]),
+        "WakeTime": parse_utc_to_local(parsed["WakeTime"]),
+        "Reason": _map_wake_reason(parsed["WakeSourceText"], parsed["WakeSourceType"]),
     }
 
 
@@ -366,7 +361,7 @@ class CalendarDialog(tk.Toplevel):
                 btn.config(
                     text=str(day),
                     command=lambda d=day: self.select_date(y, m, d),
-                    state=tk.NORMAL
+                    state=tk.NORMAL,
                 )
             else:
                 btn.config(text="", state=tk.DISABLED)
@@ -498,7 +493,9 @@ class WakeEventViewerApp:
         self.status_var.set("取得中...")
         self.root.update()
 
-        threading.Thread(target=self.fetch_task, args=(start_val, end_val), daemon=True).start()
+        threading.Thread(
+            target=self.fetch_task, args=(start_val, end_val), daemon=True
+        ).start()
 
     def fetch_task(self, start: Optional[str], end: Optional[str]) -> None:
         try:
@@ -532,7 +529,7 @@ class WakeEventViewerApp:
 
 def run_gui() -> None:
     root = tk.Tk()
-    app = WakeEventViewerApp(root)
+    WakeEventViewerApp(root)
     root.mainloop()
 
 
