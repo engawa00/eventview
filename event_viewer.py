@@ -115,12 +115,19 @@ def _execute_wevtutil_query(query: str) -> str:
     if os.name == "nt":
         creationflags = 0x08000000  # CREATE_NO_WINDOW
 
+    error_msg = "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
+
     try:
         result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
     except PermissionError:
-        raise RuntimeError(
-            "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
-        )
+        raise RuntimeError(error_msg)
+
+    if result.returncode == 5:
+        raise RuntimeError(error_msg)
+
+    stderr_output = result.stderr.decode("utf-8", errors="ignore")
+    if "Access is denied" in stderr_output or "アクセスが拒否されました" in stderr_output:
+        raise RuntimeError(error_msg)
 
     # Windowsのコマンドプロンプト出力は通常cp932または適宜エンコーディングされるため、フォールバックしつつデコード
     try:
@@ -128,16 +135,8 @@ def _execute_wevtutil_query(query: str) -> str:
     except UnicodeDecodeError:
         xml_output = result.stdout.decode("utf-8", errors="replace")
 
-    if (
-        result.returncode == 5
-        or "Access is denied" in xml_output
-        or "アクセスが拒否されました" in xml_output
-        or "Access is denied" in result.stderr.decode("utf-8", errors="ignore")
-        or "アクセスが拒否されました" in result.stderr.decode("utf-8", errors="ignore")
-    ):
-        raise RuntimeError(
-            "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
-        )
+    if "Access is denied" in xml_output or "アクセスが拒否されました" in xml_output:
+        raise RuntimeError(error_msg)
 
     return xml_output
 
