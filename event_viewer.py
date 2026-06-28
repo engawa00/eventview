@@ -111,7 +111,9 @@ def _execute_wevtutil_query(query: str) -> str:
     if os.name == "nt":
         creationflags = 0x08000000  # CREATE_NO_WINDOW
 
-    error_msg = "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
+    error_msg = (
+        "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
+    )
 
     try:
         result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
@@ -122,7 +124,10 @@ def _execute_wevtutil_query(query: str) -> str:
         raise RuntimeError(error_msg)
 
     stderr_output = result.stderr.decode("utf-8", errors="ignore")
-    if "Access is denied" in stderr_output or "アクセスが拒否されました" in stderr_output:
+    if (
+        "Access is denied" in stderr_output
+        or "アクセスが拒否されました" in stderr_output
+    ):
         raise RuntimeError(error_msg)
 
     # Windowsのコマンドプロンプト出力は通常cp932または適宜エンコーディングされるため、フォールバックしつつデコード
@@ -377,6 +382,13 @@ class WakeEventViewerApp:
         self.frame = ttk.Frame(self.root, padding="10")
         self.frame.pack(fill=tk.BOTH, expand=True)
 
+        self._create_input_frame()
+        self._create_tree_view()
+        self._create_details_view()
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+    def _create_input_frame(self) -> None:
         self.input_frame = ttk.Frame(self.frame)
         self.input_frame.pack(fill=tk.X, pady=(0, 10))
 
@@ -421,6 +433,7 @@ class WakeEventViewerApp:
         self.status_label = ttk.Label(self.input_frame, textvariable=self.status_var)
         self.status_label.pack(side=tk.LEFT, padx=(10, 0))
 
+    def _create_tree_view(self) -> None:
         self.paned = ttk.PanedWindow(self.frame, orient=tk.VERTICAL)
         self.paned.pack(fill=tk.BOTH, expand=True)
 
@@ -445,6 +458,7 @@ class WakeEventViewerApp:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+    def _create_details_view(self) -> None:
         self.details_frame = ttk.Frame(self.paned)
         self.paned.add(self.details_frame, weight=1)
 
@@ -455,8 +469,6 @@ class WakeEventViewerApp:
             self.details_frame, height=5, wrap=tk.WORD, state=tk.DISABLED
         )
         self.details_text.pack(fill=tk.BOTH, expand=True)
-
-        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
     def on_tree_select(self, event: Any) -> None:
         selected = self.tree.selection()
