@@ -111,7 +111,9 @@ def _execute_wevtutil_query(query: str) -> str:
     if os.name == "nt":
         creationflags = 0x08000000  # CREATE_NO_WINDOW
 
-    error_msg = "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
+    error_msg = (
+        "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
+    )
 
     try:
         result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
@@ -122,7 +124,10 @@ def _execute_wevtutil_query(query: str) -> str:
         raise RuntimeError(error_msg)
 
     stderr_output = result.stderr.decode("utf-8", errors="ignore")
-    if "Access is denied" in stderr_output or "アクセスが拒否されました" in stderr_output:
+    if (
+        "Access is denied" in stderr_output
+        or "アクセスが拒否されました" in stderr_output
+    ):
         raise RuntimeError(error_msg)
 
     # Windowsのコマンドプロンプト出力は通常cp932または適宜エンコーディングされるため、フォールバックしつつデコード
@@ -259,20 +264,7 @@ class CalendarDialog(tk.Toplevel):
         self.title("日付選択")
         self.withdraw()
 
-        self.update_idletasks()
-        w, h = 250, 250
-        if trigger_widget:
-            x = trigger_widget.winfo_rootx()
-            y = trigger_widget.winfo_rooty() + trigger_widget.winfo_height()
-            screen_w = self.winfo_screenwidth()
-            screen_h = self.winfo_screenheight()
-
-            if x + w > screen_w or y + h > screen_h:
-                self.geometry(f"{w}x{h}+0+0")
-            else:
-                self.geometry(f"{w}x{h}+{x}+{y}")
-        else:
-            self.geometry(f"{w}x{h}")
+        self._position_window(trigger_widget)
 
         self.transient(parent)
         self.grab_set()
@@ -296,6 +288,22 @@ class CalendarDialog(tk.Toplevel):
         self.create_widgets()
         self.update_calendar()
         self.deiconify()
+
+    def _position_window(self, trigger_widget: Optional[tk.Widget]) -> None:
+        self.update_idletasks()
+        w, h = 250, 250
+        if trigger_widget:
+            x = trigger_widget.winfo_rootx()
+            y = trigger_widget.winfo_rooty() + trigger_widget.winfo_height()
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+
+            if x + w > screen_w or y + h > screen_h:
+                self.geometry(f"{w}x{h}+0+0")
+            else:
+                self.geometry(f"{w}x{h}+{x}+{y}")
+        else:
+            self.geometry(f"{w}x{h}")
 
     def create_widgets(self) -> None:
         header_frame = ttk.Frame(self)
