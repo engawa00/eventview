@@ -264,20 +264,7 @@ class CalendarDialog(tk.Toplevel):
         self.title("日付選択")
         self.withdraw()
 
-        self.update_idletasks()
-        w, h = 250, 250
-        if trigger_widget:
-            x = trigger_widget.winfo_rootx()
-            y = trigger_widget.winfo_rooty() + trigger_widget.winfo_height()
-            screen_w = self.winfo_screenwidth()
-            screen_h = self.winfo_screenheight()
-
-            if x + w > screen_w or y + h > screen_h:
-                self.geometry(f"{w}x{h}+0+0")
-            else:
-                self.geometry(f"{w}x{h}+{x}+{y}")
-        else:
-            self.geometry(f"{w}x{h}")
+        self._position_window(trigger_widget)
 
         self.transient(parent)
         self.grab_set()
@@ -301,6 +288,22 @@ class CalendarDialog(tk.Toplevel):
         self.create_widgets()
         self.update_calendar()
         self.deiconify()
+
+    def _position_window(self, trigger_widget: Optional[tk.Widget]) -> None:
+        self.update_idletasks()
+        w, h = 250, 250
+        if trigger_widget:
+            x = trigger_widget.winfo_rootx()
+            y = trigger_widget.winfo_rooty() + trigger_widget.winfo_height()
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+
+            if x + w > screen_w or y + h > screen_h:
+                self.geometry(f"{w}x{h}+0+0")
+            else:
+                self.geometry(f"{w}x{h}+{x}+{y}")
+        else:
+            self.geometry(f"{w}x{h}")
 
     def create_widgets(self) -> None:
         header_frame = ttk.Frame(self)
