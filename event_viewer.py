@@ -23,7 +23,9 @@ def local_to_utc_str(date_str: str, is_end_of_day: bool = False) -> str:
     try:
         dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
-        raise ValueError(f"Invalid date format: '{date_str}'. Please use YYYY-MM-DD.")
+        raise ValueError(
+            f"Invalid date format: '{date_str}'. Please use YYYY-MM-DD."
+        )
     if is_end_of_day:
         dt = dt.replace(hour=23, minute=59, second=59, microsecond=999000)
     dt_aware = dt.astimezone()
@@ -63,6 +65,14 @@ def parse_utc_to_local(utc_str: str) -> str:
             pass
 
     for fmt in UTC_FORMATS:
+        # Fast fail to avoid expensive exception handling for mismatches
+        if len(fmt_str) < 19:
+            continue
+        if fmt.endswith("Z") and not fmt_str.endswith("Z"):
+            continue
+        if "T" in fmt and "T" not in fmt_str:
+            continue
+
         try:
             dt_utc = datetime.datetime.strptime(fmt_str, fmt).replace(
                 tzinfo=datetime.timezone.utc
@@ -84,7 +94,10 @@ def get_wevtutil_path() -> str:
 def _build_wevtutil_query(
     start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> str:
-    query = "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)"
+    query = (
+        "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] "
+        "and (EventID=1)"
+    )
 
     time_conds = []
     if start_date:
@@ -111,12 +124,12 @@ def _execute_wevtutil_query(query: str) -> str:
     if os.name == "nt":
         creationflags = 0x08000000  # CREATE_NO_WINDOW
 
-    error_msg = (
-        "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
-    )
+    error_msg = "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。"
 
     try:
-        result = subprocess.run(cmd, capture_output=True, creationflags=creationflags)
+        result = subprocess.run(
+            cmd, capture_output=True, creationflags=creationflags
+        )
     except PermissionError:
         raise RuntimeError(error_msg)
 
@@ -136,7 +149,10 @@ def _execute_wevtutil_query(query: str) -> str:
     except UnicodeDecodeError:
         xml_output = result.stdout.decode("utf-8", errors="replace")
 
-    if "Access is denied" in xml_output or "アクセスが拒否されました" in xml_output:
+    if (
+        "Access is denied" in xml_output
+        or "アクセスが拒否されました" in xml_output
+    ):
         raise RuntimeError(error_msg)
 
     return xml_output
@@ -177,7 +193,9 @@ def _parse_single_event(
     return {
         "SleepTime": parse_utc_to_local(parsed["SleepTime"]),
         "WakeTime": parse_utc_to_local(parsed["WakeTime"]),
-        "Reason": _map_wake_reason(parsed["WakeSourceText"], parsed["WakeSourceType"]),
+        "Reason": _map_wake_reason(
+            parsed["WakeSourceText"], parsed["WakeSourceType"]
+        ),
     }
 
 
@@ -209,7 +227,11 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
         )
         # 効率化のため、ループの外で正しいパスを特定する
         data_path = next(
-            (p for p in data_paths if events and events[0].find(p, ns) is not None),
+            (
+                p
+                for p in data_paths
+                if events and events[0].find(p, ns) is not None
+            ),
             data_paths[0],
         )
 
@@ -247,7 +269,8 @@ def run_cli(start: Optional[str], end: Optional[str]) -> None:
     print("-" * 80)
     for i, ev in enumerate(events, 1):
         print(
-            f"[{i}] スリープ日時: {ev.get('SleepTime')} | 復帰日時: {ev.get('WakeTime')} | 理由: {ev.get('Reason')}"
+            f"[{i}] スリープ日時: {ev.get('SleepTime')} | "
+            f"復帰日時: {ev.get('WakeTime')} | 理由: {ev.get('Reason')}"
         )
     print("-" * 80)
 
@@ -309,21 +332,25 @@ class CalendarDialog(tk.Toplevel):
         header_frame = ttk.Frame(self)
         header_frame.pack(fill=tk.X, pady=5)
 
-        ttk.Button(header_frame, text="<", width=3, command=self.prev_month).pack(
-            side=tk.LEFT, padx=5
+        ttk.Button(
+            header_frame, text="<", width=3, command=self.prev_month
+        ).pack(side=tk.LEFT, padx=5)
+        self.month_label = ttk.Label(
+            header_frame, text="", font=("", 10, "bold")
         )
-        self.month_label = ttk.Label(header_frame, text="", font=("", 10, "bold"))
         self.month_label.pack(side=tk.LEFT, expand=True)
-        ttk.Button(header_frame, text=">", width=3, command=self.next_month).pack(
-            side=tk.RIGHT, padx=5
-        )
+        ttk.Button(
+            header_frame, text=">", width=3, command=self.next_month
+        ).pack(side=tk.RIGHT, padx=5)
 
         self.cal_frame = ttk.Frame(self)
         self.cal_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         days = ["月", "火", "水", "木", "金", "土", "日"]
         for i, day in enumerate(days):
-            ttk.Label(self.cal_frame, text=day).grid(row=0, column=i, padx=5, pady=2)
+            ttk.Label(self.cal_frame, text=day).grid(
+                row=0, column=i, padx=5, pady=2
+            )
 
         self.date_buttons = []
         for r in range(1, 7):
@@ -423,7 +450,9 @@ class WakeEventViewerApp:
             width=3,
         )
         self.cal_btn_end.config(
-            command=lambda: CalendarDialog(self.root, self.end_entry, self.cal_btn_end)
+            command=lambda: CalendarDialog(
+                self.root, self.end_entry, self.cal_btn_end
+            )
         )
         self.cal_btn_end.pack(side=tk.LEFT, padx=(0, 15))
 
@@ -433,7 +462,9 @@ class WakeEventViewerApp:
         self.btn_fetch.pack(side=tk.LEFT)
 
         self.status_var = tk.StringVar(value="準備完了")
-        self.status_label = ttk.Label(self.input_frame, textvariable=self.status_var)
+        self.status_label = ttk.Label(
+            self.input_frame, textvariable=self.status_var
+        )
         self.status_label.pack(side=tk.LEFT, padx=(10, 0))
 
     def _create_tree_view(self) -> None:
@@ -444,7 +475,9 @@ class WakeEventViewerApp:
         self.paned.add(self.tree_frame, weight=3)
 
         columns = ("SleepTime", "WakeTime", "Reason")
-        self.tree = ttk.Treeview(self.tree_frame, columns=columns, show="headings")
+        self.tree = ttk.Treeview(
+            self.tree_frame, columns=columns, show="headings"
+        )
         self.tree.heading("SleepTime", text="スリープ日時")
         self.tree.heading("WakeTime", text="復帰日時")
         self.tree.heading("Reason", text="復帰理由")
@@ -515,7 +548,9 @@ class WakeEventViewerApp:
             self.root.after(0, self._on_fetch_error, str(e))
 
     def _on_fetch_error(self, err_msg: str) -> None:
-        messagebox.showerror("エラー", f"イベントの取得に失敗しました:\n{err_msg}")
+        messagebox.showerror(
+            "エラー", f"イベントの取得に失敗しました:\n{err_msg}"
+        )
         self.btn_fetch.config(state="normal")
         self.status_var.set("取得失敗")
 
@@ -533,7 +568,11 @@ class WakeEventViewerApp:
             self.tree.insert(
                 "",
                 tk.END,
-                values=(ev.get("SleepTime"), ev.get("WakeTime"), ev.get("Reason")),
+                values=(
+                    ev.get("SleepTime"),
+                    ev.get("WakeTime"),
+                    ev.get("Reason"),
+                ),
             )
 
 
@@ -556,10 +595,16 @@ if __name__ == "__main__":
         epilog=epilog_text,
     )
     parser.add_argument(
-        "--start", metavar="YYYY-MM-DD", help="開始日 (例: 2023-10-01)", default=""
+        "--start",
+        metavar="YYYY-MM-DD",
+        help="開始日 (例: 2023-10-01)",
+        default="",
     )
     parser.add_argument(
-        "--end", metavar="YYYY-MM-DD", help="終了日 (例: 2023-10-31)", default=""
+        "--end",
+        metavar="YYYY-MM-DD",
+        help="終了日 (例: 2023-10-31)",
+        default="",
     )
     parser.add_argument(
         "--cli",
