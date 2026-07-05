@@ -464,19 +464,19 @@ def test_build_wevtutil_query(mock_local_to_utc_str):
 
     # Both None
     q = event_viewer._build_wevtutil_query()
-    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)]]"
+    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507))]]"
 
     # Only start
     q = event_viewer._build_wevtutil_query(start_date="2024-01-01")
-    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z']]]"
+    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z']]]"
 
     # Only end
     q = event_viewer._build_wevtutil_query(end_date="2024-01-02")
-    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime<='2024-01-02T23:59:59Z']]]"
+    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime<='2024-01-02T23:59:59Z']]]"
 
     # Both
     q = event_viewer._build_wevtutil_query(start_date="2024-01-01", end_date="2024-01-02")
-    assert q == "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
+    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
 
 def test_parse_wake_events_xml_empty():
     """Test _parse_wake_events_xml with empty or whitespace-only strings."""
@@ -667,3 +667,49 @@ def test_on_tree_select_with_selection_no_reason():
     app.details_text.delete.assert_called_once_with(1.0, event_viewer.tk.END)
     app.details_text.insert.assert_called_once_with(event_viewer.tk.END, "")
     app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
+
+
+def test_map_kp_507_reason():
+    # 既知のマッピング
+    assert "電源ボタン (Power Button)" in event_viewer._map_kp_507_reason("1")
+    assert "液晶カバーの開閉 (Lid)" in event_viewer._map_kp_507_reason("15")
+    assert "自動メンテナンス" in event_viewer._map_kp_507_reason("16777220")
+    
+    # 存在しないコード
+    assert event_viewer._map_kp_507_reason("999") == "コード 999"
+    # 数値以外
+    assert event_viewer._map_kp_507_reason("some-text") == "some-text"
+    assert event_viewer._map_kp_507_reason("") == "不明"
+    assert event_viewer._map_kp_507_reason(None) == "不明"
+
+
+def test_parse_wake_events_xml_with_kp_507_merge():
+    xml_data = """
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <Provider Name="Microsoft-Windows-Power-Troubleshooter"/>
+        <EventID>1</EventID>
+      </System>
+      <EventData>
+        <Data Name="SleepTime">2026-01-01T12:00:00.000Z</Data>
+        <Data Name="WakeTime">2026-01-01T13:00:00.000Z</Data>
+        <Data Name="WakeSourceType">0</Data>
+        <Data Name="WakeSourceText"></Data>
+      </EventData>
+    </Event>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+      <System>
+        <Provider Name="Microsoft-Windows-Kernel-Power"/>
+        <EventID>507</EventID>
+        <TimeCreated SystemTime="2026-01-01T13:00:00.100Z"/>
+      </System>
+      <EventData>
+        <Data Name="Reason">1</Data>
+      </EventData>
+    </Event>
+    """
+    
+    events = event_viewer._parse_wake_events_xml(xml_data)
+    assert len(events) == 1
+    assert "電源ボタン (Power Button)" in events[0]["Reason"]
+    assert "不明 (Unknown)" in events[0]["Reason"]
