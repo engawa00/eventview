@@ -43,9 +43,9 @@ def validate_date(date_str: Optional[str]) -> bool:
     return True
 
 
-def parse_utc_to_local(utc_str: str) -> str:
+def parse_utc_str_to_datetime(utc_str: str) -> Optional[datetime.datetime]:
     if not utc_str:
-        return ""
+        return None
 
     parsed_str = utc_str
     fmt_str = utc_str
@@ -59,8 +59,7 @@ def parse_utc_to_local(utc_str: str) -> str:
             parsed_str = f"{utc_str[:-1]}+00:00"
 
         try:
-            dt_utc = datetime.datetime.fromisoformat(parsed_str)
-            return dt_utc.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.datetime.fromisoformat(parsed_str)
         except ValueError:
             pass
 
@@ -77,10 +76,19 @@ def parse_utc_to_local(utc_str: str) -> str:
             dt_utc = datetime.datetime.strptime(fmt_str, fmt).replace(
                 tzinfo=datetime.timezone.utc
             )
-            return dt_utc.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+            return dt_utc
         except ValueError:
             continue
 
+    return None
+
+
+def parse_utc_to_local(utc_str: str) -> str:
+    if not utc_str:
+        return ""
+    dt = parse_utc_str_to_datetime(utc_str)
+    if dt:
+        return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S")
     return utc_str
 
 
@@ -95,8 +103,10 @@ def _build_wevtutil_query(
     start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> str:
     query = (
-        "*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] "
-        "and (EventID=1)"
+        "*[System[("
+        "(Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) "
+        "or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)"
+        ")"
     )
 
     time_conds = []
@@ -172,6 +182,53 @@ def _map_wake_reason(wake_reason: str, wake_type: str) -> str:
     return "不明"
 
 
+def _map_kp_507_reason(reason_str: str) -> str:
+    if not reason_str:
+        return "不明"
+
+    if not reason_str.isdigit():
+        return reason_str
+
+    reason_code = int(reason_str)
+    base_code = reason_code & 0xFFFF
+
+    mapping = {
+        0: "不明 (Unknown)",
+        1: "電源ボタン (Power Button)",
+        2: "スリープ解除デバイス (Wake Device)",
+        3: "モニターパワーの変更 / カバー開閉 (SC_MONITORPOWER)",
+        4: "ユーザー入力 (User Input)",
+        5: "電源状態の変更 (AC/DC Display Burst)",
+        11: "システム状態の変更 (System State Change)",
+        12: "アプリケーション (Application)",
+        13: "システムAPI (System API)",
+        14: "画面タイムアウト (Screen Timeout)",
+        15: "液晶カバーの開閉 (Lid)",
+        16: "音声再生 (Audio Playing)",
+        17: "ネットワーク接続 (Network Connection)",
+        19: "Windows Update",
+        21: "温度異常 (Thermal)",
+        22: "バッテリー (Battery)",
+        23: "電源プラン変更 (Power Scheme)",
+        24: "リモートデスクトップ (Remote Desktop)",
+        28: "電源状態の変更抑制 (AC/DC Display Burst Suppressed)",
+        31: "キーボード入力 (Input Keyboard)",
+        32: "マウス入力 (Input Mouse)",
+        33: "タッチパッド入力 (Input Touchpad)",
+        34: "タッチ入力 (Input Touch)",
+        35: "ペン入力 (Input Pen)",
+    }
+
+    if reason_code == 16777220:
+        return "自動メンテナンス (PDC Task Client: Maintenance Scheduler)"
+
+    result = mapping.get(base_code)
+    if result:
+        return f"{result} (コード {reason_str})"
+
+    return f"コード {reason_str}"
+
+
 def _parse_single_event(
     event: Any, data_path: str, ns: Dict[str, str]
 ) -> Dict[str, str]:
@@ -206,6 +263,7 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
     # wevtutil qe outputs a sequence of <Event> but no root wrapper.
     xml_doc = f"<Events>{xml_output}</Events>"
     events_data = []
+    kp_events = []
 
     try:
         root = ET.fromstring(xml_doc)
@@ -235,8 +293,117 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
             data_paths[0],
         )
 
+        # 1パス目: EventID=507 のイベントを収集する
         for event in events:
-            events_data.append(_parse_single_event(event, data_path, ns))
+            system_node = event.find("win:System", ns)
+            if system_node is None:
+                system_node = event.find("System", ns)
+            if system_node is None:
+                for child in event:
+                    if child.tag.endswith("System"):
+                        system_node = child
+                        break
+            if system_node is None:
+                continue
+
+            event_id_node = system_node.find("win:EventID", ns)
+            if event_id_node is None:
+                event_id_node = system_node.find("EventID", ns)
+            if event_id_node is None:
+                for child in system_node:
+                    if child.tag.endswith("EventID"):
+                        event_id_node = child
+                        break
+            if event_id_node is None:
+                continue
+            event_id = event_id_node.text or ""
+
+            if event_id == "507":
+                time_node = system_node.find("win:TimeCreated", ns)
+                if time_node is None:
+                    time_node = system_node.find("TimeCreated", ns)
+                if time_node is None:
+                    for child in system_node:
+                        if child.tag.endswith("TimeCreated"):
+                            time_node = child
+                            break
+                time_created_utc = ""
+                if time_node is not None:
+                    time_created_utc = time_node.get("SystemTime") or ""
+
+                reason_val = ""
+                event_data = event.find(data_path, ns)
+                if event_data is not None:
+                    for data in event_data:
+                        if data.get("Name") == "Reason":
+                            reason_val = data.text or ""
+                            break
+
+                dt_utc = parse_utc_str_to_datetime(time_created_utc)
+                if dt_utc:
+                    kp_events.append({
+                        "Time": dt_utc,
+                        "Reason": reason_val
+                    })
+
+        # 2パス目: EventID=1 のイベントをパース・マージする
+        for event in events:
+            system_node = event.find("win:System", ns)
+            if system_node is None:
+                system_node = event.find("System", ns)
+            if system_node is None:
+                for child in event:
+                    if child.tag.endswith("System"):
+                        system_node = child
+                        break
+
+            event_id = "1"
+            if system_node is not None:
+                event_id_node = system_node.find("win:EventID", ns)
+                if event_id_node is None:
+                    event_id_node = system_node.find("EventID", ns)
+                if event_id_node is None:
+                    for child in system_node:
+                        if child.tag.endswith("EventID"):
+                            event_id_node = child
+                            break
+                if event_id_node is not None:
+                    event_id = event_id_node.text or "1"
+
+            if event_id == "1":
+                parsed_ev = _parse_single_event(event, data_path, ns)
+                
+                # WakeTime（ローカル時間形式など）に対応するUTC datetimeが必要
+                parsed_raw = {
+                    "WakeTime": ""
+                }
+                event_data = event.find(data_path, ns)
+                if event_data is not None:
+                    for data in event_data:
+                        name = data.get("Name")
+                        if name == "WakeTime":
+                            parsed_raw["WakeTime"] = data.text or ""
+                            break
+
+                wake_dt = parse_utc_str_to_datetime(parsed_raw["WakeTime"])
+                reason = parsed_ev["Reason"]
+
+                if ("不明" in reason or "Unknown" in reason) and wake_dt:
+                    best_match = None
+                    min_diff = datetime.timedelta(seconds=5)
+
+                    for kp in kp_events:
+                        diff = abs(kp["Time"] - wake_dt)
+                        if diff < min_diff:
+                            min_diff = diff
+                            best_match = kp
+
+                    if best_match:
+                        friendly_reason = _map_kp_507_reason(best_match["Reason"])
+                        reason = f"{reason} [モダンスタンバイ復帰理由: {friendly_reason}]"
+                        parsed_ev["Reason"] = reason
+
+                events_data.append(parsed_ev)
 
     except ET.ParseError as e:
         raise RuntimeError(f"Failed to parse XML: {e}")
