@@ -8,8 +8,6 @@ from unittest.mock import patch
 import event_viewer
 
 def test_gui_freeze():
-    # Because we run in CI, we need a virtual display or mock tk?
-    # Actually wait, we might get TclError if there's no display.
     try:
         root = tk.Tk()
     except tk.TclError:
@@ -42,5 +40,10 @@ def test_gui_freeze():
     max_delay = max(intervals) if intervals else 0
     print(f"Max mainloop delay: {max_delay:.2f} seconds")
 
+
 if __name__ == "__main__":
+    if sys.platform.startswith("linux") and os.environ.get("DISPLAY") is None:
+        import shutil
+        if shutil.which("xvfb-run"):
+            os.execvp("xvfb-run", ["xvfb-run", "-a", sys.executable] + sys.argv)
     test_gui_freeze()
