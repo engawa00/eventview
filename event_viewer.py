@@ -104,8 +104,10 @@ def _build_wevtutil_query(
 ) -> str:
     query = (
         "*[System[("
-        "(Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) "
-        "or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)"
+        "(Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] "
+        "and EventID=1) "
+        "or (Provider[@Name='Microsoft-Windows-Kernel-Power'] "
+        "and EventID=507)"
         ")"
     )
 
@@ -293,40 +295,67 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
             data_paths[0],
         )
 
+        # 効率化のため、ループの外で System および EventID のパスも特定する
+        system_paths = (
+            "win:System",
+            "System",
+            "{http://schemas.microsoft.com/win/2004/08/events/event}System",
+        )
+        system_path = next(
+            (
+                p
+                for p in system_paths
+                if events and events[0].find(p, ns) is not None
+            ),
+            system_paths[0],
+        )
+
+        event_id_paths = (
+            "win:EventID",
+            "EventID",
+            "{http://schemas.microsoft.com/win/2004/08/events/event}EventID",
+        )
+        # 最初のイベントの System ノードを取得して EventID のパスを判定
+        first_system = events[0].find(system_path, ns) if events else None
+        event_id_path = next(
+            (
+                p
+                for p in event_id_paths
+                if first_system is not None
+                and first_system.find(p, ns) is not None
+            ),
+            event_id_paths[0],
+        )
+
+        time_created_paths = (
+            "win:TimeCreated",
+            "TimeCreated",
+            "{http://schemas.microsoft.com/win/2004/08/events/event}"
+            "TimeCreated",
+        )
+        time_created_path = next(
+            (
+                p
+                for p in time_created_paths
+                if first_system is not None
+                and first_system.find(p, ns) is not None
+            ),
+            time_created_paths[0],
+        )
+
         # 1パス目: EventID=507 のイベントを収集する
         for event in events:
-            system_node = event.find("win:System", ns)
-            if system_node is None:
-                system_node = event.find("System", ns)
-            if system_node is None:
-                for child in event:
-                    if child.tag.endswith("System"):
-                        system_node = child
-                        break
+            system_node = event.find(system_path, ns)
             if system_node is None:
                 continue
 
-            event_id_node = system_node.find("win:EventID", ns)
-            if event_id_node is None:
-                event_id_node = system_node.find("EventID", ns)
-            if event_id_node is None:
-                for child in system_node:
-                    if child.tag.endswith("EventID"):
-                        event_id_node = child
-                        break
+            event_id_node = system_node.find(event_id_path, ns)
             if event_id_node is None:
                 continue
             event_id = event_id_node.text or ""
 
             if event_id == "507":
-                time_node = system_node.find("win:TimeCreated", ns)
-                if time_node is None:
-                    time_node = system_node.find("TimeCreated", ns)
-                if time_node is None:
-                    for child in system_node:
-                        if child.tag.endswith("TimeCreated"):
-                            time_node = child
-                            break
+                time_node = system_node.find(time_created_path, ns)
                 time_created_utc = ""
                 if time_node is not None:
                     time_created_utc = time_node.get("SystemTime") or ""
@@ -341,42 +370,23 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
 
                 dt_utc = parse_utc_str_to_datetime(time_created_utc)
                 if dt_utc:
-                    kp_events.append({
-                        "Time": dt_utc,
-                        "Reason": reason_val
-                    })
+                    kp_events.append({"Time": dt_utc, "Reason": reason_val})
 
         # 2パス目: EventID=1 のイベントをパース・マージする
         for event in events:
-            system_node = event.find("win:System", ns)
-            if system_node is None:
-                system_node = event.find("System", ns)
-            if system_node is None:
-                for child in event:
-                    if child.tag.endswith("System"):
-                        system_node = child
-                        break
+            system_node = event.find(system_path, ns)
 
             event_id = "1"
             if system_node is not None:
-                event_id_node = system_node.find("win:EventID", ns)
-                if event_id_node is None:
-                    event_id_node = system_node.find("EventID", ns)
-                if event_id_node is None:
-                    for child in system_node:
-                        if child.tag.endswith("EventID"):
-                            event_id_node = child
-                            break
+                event_id_node = system_node.find(event_id_path, ns)
                 if event_id_node is not None:
                     event_id = event_id_node.text or "1"
 
             if event_id == "1":
                 parsed_ev = _parse_single_event(event, data_path, ns)
-                
+
                 # WakeTime（ローカル時間形式など）に対応するUTC datetimeが必要
-                parsed_raw = {
-                    "WakeTime": ""
-                }
+                parsed_raw = {"WakeTime": ""}
                 event_data = event.find(data_path, ns)
                 if event_data is not None:
                     for data in event_data:
@@ -399,7 +409,9 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
                             best_match = kp
 
                     if best_match:
-                        friendly_reason = _map_kp_507_reason(best_match["Reason"])
+                        friendly_reason = _map_kp_507_reason(
+                            best_match["Reason"]
+                        )
                         reason = f"{reason} [モダンスタンバイ復帰理由: {friendly_reason}]"
                         parsed_ev["Reason"] = reason
 
