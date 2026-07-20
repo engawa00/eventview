@@ -1,8 +1,8 @@
 import timeit
 import xml.etree.ElementTree as ET
-from typing import List, Dict
 
-# Sample XML data similar to what wevtutil might produce, but repeated many times
+
+# Sample XML data similar to wevtutil output, repeated many times
 def generate_xml(n: int) -> str:
     event_template = """
     <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
@@ -18,10 +18,12 @@ def generate_xml(n: int) -> str:
     </Event>"""
     return f"<Events>{event_template * n}</Events>"
 
+
 xml_doc_large = generate_xml(1000)
 ns = {"win": "http://schemas.microsoft.com/win/2004/08/events/event"}
 root = ET.fromstring(xml_doc_large)
 events = root.findall("win:Event", ns)
+
 
 def original_loop():
     data_paths = (
@@ -32,12 +34,17 @@ def original_loop():
     results = []
     for event in events:
         event_data = next(
-            (node for p in data_paths if (node := event.find(p, ns)) is not None),
+            (
+                node
+                for p in data_paths
+                if (node := event.find(p, ns)) is not None
+            ),
             None,
         )
         if event_data is not None:
             results.append(event_data)
     return results
+
 
 def optimized_loop():
     data_paths = (
@@ -64,6 +71,7 @@ def optimized_loop():
         # Fallback or just empty
         pass
     return results
+
 
 if __name__ == "__main__":
     print(f"Original: {timeit.timeit(original_loop, number=100)}s")
