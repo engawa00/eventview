@@ -12,14 +12,13 @@ import itertools
 import tkinter as tk
 import threading
 import functools
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, NamedTuple, Tuple
 from tkinter import ttk, messagebox
 
 UTC_FORMATS = ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ")
 
 
 def local_to_utc_str(date_str: str, is_end_of_day: bool = False) -> str:
-
     try:
         dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -231,30 +230,135 @@ def _map_kp_507_reason(reason_str: str) -> str:
     return f"コード {reason_str}"
 
 
-def _parse_single_event(
-    event: Any, data_path: str, ns: Dict[str, str]
-) -> Dict[str, str]:
-    parsed = {
-        "SleepTime": "",
-        "WakeTime": "",
-        "WakeSourceText": "",
-        "WakeSourceType": "",
-    }
-    event_data = event.find(data_path, ns)
+_EVENT_NS_URI = "http://schemas.microsoft.com/win/2004/08/events/event"
+_EVENT_NS = {"win": _EVENT_NS_URI}
 
-    if event_data is not None:
-        # 名前空間あり・なし両方対応できるようにする
-        for data in event_data:
-            name = data.get("Name")
-            if name in parsed:
-                parsed[name] = data.text or ""
+
+class _EventPaths(NamedTuple):
+    system: str
+    event_id: str
+    time_created: str
+    data: str
+
+
+def _tag_candidates(tag: str) -> Tuple[str, str, str]:
+    # 名前空間あり・なし両方対応できるようにする
+    return (f"win:{tag}", tag, f"{{{_EVENT_NS_URI}}}{tag}")
+
+
+def _resolve_tag_path(node: Any, tag: str) -> str:
+    """候補パスのうち node 配下で最初に見つかるものを返す。
+
+    見つからない場合は先頭の候補を返す。
+    """
+    candidates = _tag_candidates(tag)
+    return next(
+        (
+            p
+            for p in candidates
+            if node is not None and node.find(p, _EVENT_NS) is not None
+        ),
+        candidates[0],
+    )
+
+
+def _resolve_event_paths(first_event: Any) -> _EventPaths:
+    # 効率化のため、ループの外で一度だけ各要素のパスを特定する
+    system_path = _resolve_tag_path(first_event, "System")
+    first_system = first_event.find(system_path, _EVENT_NS)
+    return _EventPaths(
+        system=system_path,
+        event_id=_resolve_tag_path(first_system, "EventID"),
+        time_created=_resolve_tag_path(first_system, "TimeCreated"),
+        data=_resolve_tag_path(first_event, "EventData"),
+    )
+
+
+def _get_event_id(event: Any, paths: _EventPaths, default: str = "") -> str:
+    system_node = event.find(paths.system, _EVENT_NS)
+    if system_node is None:
+        return default
+    event_id_node = system_node.find(paths.event_id, _EVENT_NS)
+    if event_id_node is None:
+        return default
+    return event_id_node.text or default
+
+
+def _get_event_data_values(event: Any, data_path: str) -> Dict[str, str]:
+    event_data = event.find(data_path, _EVENT_NS)
+    if event_data is None:
+        return {}
+    return {
+        data.get("Name"): data.text or ""
+        for data in event_data
+        if data.get("Name")
+    }
+
+
+def _collect_kp_507_events(
+    events: List[Any], paths: _EventPaths
+) -> List[Dict[str, Any]]:
+    """EventID=507 (Kernel-Power) のイベントを発生時刻付きで収集する。"""
+    kp_events = []
+    for event in events:
+        if _get_event_id(event, paths) != "507":
+            continue
+
+        system_node = event.find(paths.system, _EVENT_NS)
+        time_node = system_node.find(paths.time_created, _EVENT_NS)
+        time_created_utc = ""
+        if time_node is not None:
+            time_created_utc = time_node.get("SystemTime") or ""
+
+        dt_utc = parse_utc_str_to_datetime(time_created_utc)
+        if dt_utc:
+            values = _get_event_data_values(event, paths.data)
+            kp_events.append(
+                {"Time": dt_utc, "Reason": values.get("Reason", "")}
+            )
+    return kp_events
+
+
+def _find_kp_507_reason(
+    kp_events: List[Dict[str, Any]],
+    wake_dt: Optional[datetime.datetime],
+) -> Optional[str]:
+    """復帰時刻に最も近い(5秒未満) 507 イベントの理由を返す。"""
+    if not wake_dt:
+        return None
+
+    best_match = None
+    min_diff = datetime.timedelta(seconds=5)
+    for kp in kp_events:
+        diff = abs(kp["Time"] - wake_dt)
+        if diff < min_diff:
+            min_diff = diff
+            best_match = kp
+
+    if best_match is None:
+        return None
+    return _map_kp_507_reason(best_match["Reason"])
+
+
+def _parse_single_event(
+    event: Any, paths: _EventPaths, kp_events: List[Dict[str, Any]]
+) -> Dict[str, str]:
+    values = _get_event_data_values(event, paths.data)
+    reason = _map_wake_reason(
+        values.get("WakeSourceText", ""), values.get("WakeSourceType", "")
+    )
+
+    if "不明" in reason or "Unknown" in reason:
+        # 理由が不明な場合、直近の 507 イベントから復帰理由を補完する
+        wake_dt = parse_utc_str_to_datetime(values.get("WakeTime", ""))
+        friendly_reason = _find_kp_507_reason(kp_events, wake_dt)
+        if friendly_reason:
+            reason = f"{reason} [モダンスタンバイ復帰理由: {friendly_reason}]"
 
     return {
-        "SleepTime": parse_utc_to_local(parsed["SleepTime"]),
-        "WakeTime": parse_utc_to_local(parsed["WakeTime"]),
-        "Reason": _map_wake_reason(
-            parsed["WakeSourceText"], parsed["WakeSourceType"]
-        ),
+        "SleepTime": parse_utc_to_local(values.get("SleepTime", "")),
+        "WakeTime": parse_utc_to_local(values.get("WakeTime", "")),
+        "Reason": reason,
     }
 
 
@@ -264,163 +368,33 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
 
     # wevtutil qe outputs a sequence of <Event> but no root wrapper.
     xml_doc = f"<Events>{xml_output}</Events>"
-    events_data = []
-    kp_events = []
-
     try:
         root = ET.fromstring(xml_doc)
-        ns = {"win": "http://schemas.microsoft.com/win/2004/08/events/event"}
-
-        event_paths = (
-            "win:Event",
-            "Event",
-            "{http://schemas.microsoft.com/win/2004/08/events/event}Event",
-        )
-        events = next(
-            (nodes for p in event_paths if (nodes := root.findall(p, ns))), []
-        )
-
-        data_paths = (
-            "win:EventData",
-            "{http://schemas.microsoft.com/win/2004/08/events/event}EventData",
-            "EventData",
-        )
-        # 効率化のため、ループの外で正しいパスを特定する
-        data_path = next(
-            (
-                p
-                for p in data_paths
-                if events and events[0].find(p, ns) is not None
-            ),
-            data_paths[0],
-        )
-
-        # 効率化のため、ループの外で System および EventID のパスも特定する
-        system_paths = (
-            "win:System",
-            "System",
-            "{http://schemas.microsoft.com/win/2004/08/events/event}System",
-        )
-        system_path = next(
-            (
-                p
-                for p in system_paths
-                if events and events[0].find(p, ns) is not None
-            ),
-            system_paths[0],
-        )
-
-        event_id_paths = (
-            "win:EventID",
-            "EventID",
-            "{http://schemas.microsoft.com/win/2004/08/events/event}EventID",
-        )
-        # 最初のイベントの System ノードを取得して EventID のパスを判定
-        first_system = events[0].find(system_path, ns) if events else None
-        event_id_path = next(
-            (
-                p
-                for p in event_id_paths
-                if first_system is not None
-                and first_system.find(p, ns) is not None
-            ),
-            event_id_paths[0],
-        )
-
-        time_created_paths = (
-            "win:TimeCreated",
-            "TimeCreated",
-            "{http://schemas.microsoft.com/win/2004/08/events/event}"
-            "TimeCreated",
-        )
-        time_created_path = next(
-            (
-                p
-                for p in time_created_paths
-                if first_system is not None
-                and first_system.find(p, ns) is not None
-            ),
-            time_created_paths[0],
-        )
-
-        # 1パス目: EventID=507 のイベントを収集する
-        for event in events:
-            system_node = event.find(system_path, ns)
-            if system_node is None:
-                continue
-
-            event_id_node = system_node.find(event_id_path, ns)
-            if event_id_node is None:
-                continue
-            event_id = event_id_node.text or ""
-
-            if event_id == "507":
-                time_node = system_node.find(time_created_path, ns)
-                time_created_utc = ""
-                if time_node is not None:
-                    time_created_utc = time_node.get("SystemTime") or ""
-
-                reason_val = ""
-                event_data = event.find(data_path, ns)
-                if event_data is not None:
-                    for data in event_data:
-                        if data.get("Name") == "Reason":
-                            reason_val = data.text or ""
-                            break
-
-                dt_utc = parse_utc_str_to_datetime(time_created_utc)
-                if dt_utc:
-                    kp_events.append({"Time": dt_utc, "Reason": reason_val})
-
-        # 2パス目: EventID=1 のイベントをパース・マージする
-        for event in events:
-            system_node = event.find(system_path, ns)
-
-            event_id = "1"
-            if system_node is not None:
-                event_id_node = system_node.find(event_id_path, ns)
-                if event_id_node is not None:
-                    event_id = event_id_node.text or "1"
-
-            if event_id == "1":
-                parsed_ev = _parse_single_event(event, data_path, ns)
-
-                # WakeTime（ローカル時間形式など）に対応するUTC datetimeが必要
-                parsed_raw = {"WakeTime": ""}
-                event_data = event.find(data_path, ns)
-                if event_data is not None:
-                    for data in event_data:
-                        name = data.get("Name")
-                        if name == "WakeTime":
-                            parsed_raw["WakeTime"] = data.text or ""
-                            break
-
-                wake_dt = parse_utc_str_to_datetime(parsed_raw["WakeTime"])
-                reason = parsed_ev["Reason"]
-
-                if ("不明" in reason or "Unknown" in reason) and wake_dt:
-                    best_match = None
-                    min_diff = datetime.timedelta(seconds=5)
-
-                    for kp in kp_events:
-                        diff = abs(kp["Time"] - wake_dt)
-                        if diff < min_diff:
-                            min_diff = diff
-                            best_match = kp
-
-                    if best_match:
-                        friendly_reason = _map_kp_507_reason(
-                            best_match["Reason"]
-                        )
-                        reason = f"{reason} [モダンスタンバイ復帰理由: {friendly_reason}]"
-                        parsed_ev["Reason"] = reason
-
-                events_data.append(parsed_ev)
-
     except ET.ParseError as e:
         raise RuntimeError(f"Failed to parse XML: {e}")
 
-    return events_data
+    events = next(
+        (
+            nodes
+            for p in _tag_candidates("Event")
+            if (nodes := root.findall(p, _EVENT_NS))
+        ),
+        [],
+    )
+    if not events:
+        return []
+
+    paths = _resolve_event_paths(events[0])
+
+    # 1パス目: EventID=507 のイベントを収集する
+    kp_events = _collect_kp_507_events(events, paths)
+
+    # 2パス目: EventID=1 のイベントをパースし、507 の理由をマージする
+    return [
+        _parse_single_event(event, paths, kp_events)
+        for event in events
+        if _get_event_id(event, paths, default="1") == "1"
+    ]
 
 
 def get_wake_events(
