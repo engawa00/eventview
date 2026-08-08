@@ -659,7 +659,7 @@ class WakeEventViewerApp:
         )
         self.details_text.pack(fill=tk.BOTH, expand=True)
 
-    def on_tree_select(self, event: Any) -> None:
+    def on_tree_select(self, _event: Any) -> None:
         selected = self.tree.selection()
         self.details_text.config(state=tk.NORMAL)
         self.details_text.delete(1.0, tk.END)
