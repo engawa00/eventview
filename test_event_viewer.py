@@ -8,26 +8,44 @@ import os
 try:
     import tkinter  # noqa: F401
 except ImportError:
-    sys.modules['tkinter'] = MagicMock()
-    sys.modules['tkinter.ttk'] = MagicMock()
-    sys.modules['tkinter.messagebox'] = MagicMock()
+    sys.modules["tkinter"] = MagicMock()
+    sys.modules["tkinter.ttk"] = MagicMock()
+    sys.modules["tkinter.messagebox"] = MagicMock()
 
 # Import the module to test
 import event_viewer
 
+
 def test_local_to_utc_str():
     # Test start of day formatting
-    res_start = event_viewer.local_to_utc_str("2026-01-01", is_end_of_day=False)
+    res_start = event_viewer.local_to_utc_str(
+        "2026-01-01", is_end_of_day=False
+    )
     assert res_start.endswith("Z")
     assert "T" in res_start
-    
+
     # Test end of day formatting
     res_end = event_viewer.local_to_utc_str("2026-01-01", is_end_of_day=True)
     assert res_end.endswith("Z")
     assert "T" in res_end
-    
+
     # End should clearly be after start (alphabetically sorted time string comparison works here)
     assert res_start < res_end
+
+
+def test_parse_utc_str_to_datetime_unexpected_format():
+    assert event_viewer.parse_utc_str_to_datetime("invalid_date") is None
+    assert event_viewer.parse_utc_str_to_datetime("hello world") is None
+    # Invalid date with dot (fractional seconds) - Month 13
+    assert (
+        event_viewer.parse_utc_str_to_datetime("2026-13-01T12:00:00.000Z")
+        is None
+    )
+    # Invalid date without dot - Day 32
+    assert (
+        event_viewer.parse_utc_str_to_datetime("2026-01-32T12:00:00Z") is None
+    )
+
 
 def test_parse_utc_to_local_valid():
     # Provide a proper UTC string and observe conversion to local
@@ -39,33 +57,43 @@ def test_parse_utc_to_local_valid():
     except ValueError:
         pytest.fail("Cannot parse the returned local time string")
 
+
 def test_parse_utc_to_local_empty():
     assert event_viewer.parse_utc_to_local("") == ""
     assert event_viewer.parse_utc_to_local(None) == ""
+
 
 def test_parse_utc_to_local_invalid():
     # Invalid string should just return as is when parsing fails
     assert event_viewer.parse_utc_to_local("invalid_date") == "invalid_date"
 
+
 def test_parse_utc_to_local_value_error():
     # Invalid date with dot (fractional seconds) - Month 13
     invalid_with_dot = "2026-13-01T12:00:00.000Z"
-    assert event_viewer.parse_utc_to_local(invalid_with_dot) == invalid_with_dot
+    assert (
+        event_viewer.parse_utc_to_local(invalid_with_dot) == invalid_with_dot
+    )
 
     # Invalid date without dot - Day 32
     invalid_without_dot = "2026-01-32T12:00:00Z"
-    assert event_viewer.parse_utc_to_local(invalid_without_dot) == invalid_without_dot
+    assert (
+        event_viewer.parse_utc_to_local(invalid_without_dot)
+        == invalid_without_dot
+    )
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_get_wake_events_empty_output(mock_run):
     mock_result = MagicMock()
     mock_result.stdout = b""
     mock_run.return_value = mock_result
-    
+
     events = event_viewer.get_wake_events()
     assert events == []
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_get_wake_events_success(mock_run):
     xml_data = """
     <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
@@ -137,15 +165,15 @@ def test_get_wake_events_success(mock_run):
     """
     mock_result = MagicMock()
     # Mocking stdout output with utf-8 payload
-    mock_result.stdout = xml_data.encode('utf-8')
+    mock_result.stdout = xml_data.encode("utf-8")
     mock_run.return_value = mock_result
-    
+
     events = event_viewer.get_wake_events()
     assert len(events) == 6
-    
+
     # Check first event
     assert events[0]["Reason"] == "Network Adapter"
-    
+
     # Check second event (Empty WakeSourceText fallback to type 1 -> Power Button)
     assert events[1]["Reason"] == "電源ボタン (Power Button)"
 
@@ -161,27 +189,32 @@ def test_get_wake_events_success(mock_run):
     # Check sixth event (Empty WakeSourceText and empty WakeSourceType fallback -> 不明)
     assert events[5]["Reason"] == "不明"
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_get_wake_events_invalid_xml(mock_run):
     # Simulate invalid XML returned by wevtutil
     mock_result = MagicMock()
-    mock_result.stdout = b"<Event><System><EventID>1</EventID></System>" # Missing closing tags
+    mock_result.stdout = (
+        b"<Event><System><EventID>1</EventID></System>"  # Missing closing tags
+    )
     mock_run.return_value = mock_result
 
     with pytest.raises(RuntimeError) as excinfo:
         event_viewer.get_wake_events()
     assert "Failed to parse XML" in str(excinfo.value)
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_get_wake_events_error(mock_run):
     # Simulate an OS error during subprocess run
     mock_run.side_effect = Exception("Command failed")
-    
+
     with pytest.raises(Exception) as excinfo:
         event_viewer.get_wake_events()
     assert "Command failed" in str(excinfo.value)
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_get_wake_events_query_with_dates(mock_run):
     # Mock return value to prevent error handling
     mock_result = MagicMock()
@@ -217,12 +250,14 @@ def test_get_wake_events_query_with_dates(mock_run):
 
     assert f"@SystemTime>='{expected_start}'" in query_arg
     assert f"@SystemTime<='{expected_end}'" in query_arg
-    assert " and " in query_arg[query_arg.find("TimeCreated["):]
+    assert " and " in query_arg[query_arg.find("TimeCreated[") :]
+
 
 def test_local_to_utc_str_invalid():
     with pytest.raises(ValueError) as excinfo:
         event_viewer.local_to_utc_str("invalid-date")
     assert "Invalid date format" in str(excinfo.value)
+
 
 def test_get_wake_events_invalid_date():
     # Pass an invalid date string to get_wake_events
@@ -230,22 +265,30 @@ def test_get_wake_events_invalid_date():
         event_viewer.get_wake_events(start_date="not-a-date")
     assert "Invalid date format" in str(excinfo.value)
 
-@patch('builtins.print')
-@patch('event_viewer.get_wake_events')
+
+@patch("builtins.print")
+@patch("event_viewer.get_wake_events")
 def test_run_cli_empty(mock_get_events, mock_print):
     mock_get_events.return_value = []
 
     event_viewer.run_cli("2026-01-01", "2026-01-02")
 
-    mock_get_events.assert_called_once_with(start_date="2026-01-01", end_date="2026-01-02")
+    mock_get_events.assert_called_once_with(
+        start_date="2026-01-01", end_date="2026-01-02"
+    )
 
     # Check that it printed the starting message
-    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    mock_print.assert_any_call(
+        "スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)"
+    )
     # Check that it printed the not found message
-    mock_print.assert_any_call("指定された期間の復帰イベントは見つかりませんでした。")
+    mock_print.assert_any_call(
+        "指定された期間の復帰イベントは見つかりませんでした。"
+    )
 
-@patch('builtins.print')
-@patch('event_viewer.get_wake_events')
+
+@patch("builtins.print")
+@patch("event_viewer.get_wake_events")
 def test_run_cli_error(mock_get_events, mock_print):
     mock_get_events.side_effect = Exception("Test error occurred")
 
@@ -256,23 +299,39 @@ def test_run_cli_error(mock_get_events, mock_print):
     # Check that it printed the error message
     mock_print.assert_any_call("エラー: Test error occurred")
 
-@patch('builtins.print')
-@patch('event_viewer.get_wake_events')
+
+@patch("builtins.print")
+@patch("event_viewer.get_wake_events")
 def test_run_cli_success(mock_get_events, mock_print):
     mock_get_events.return_value = [
-        {"SleepTime": "2026-01-01 12:00:00", "WakeTime": "2026-01-01 13:00:00", "Reason": "Power Button"},
-        {"SleepTime": "2026-01-02 12:00:00", "WakeTime": "2026-01-02 13:00:00", "Reason": "Network Adapter"}
+        {
+            "SleepTime": "2026-01-01 12:00:00",
+            "WakeTime": "2026-01-01 13:00:00",
+            "Reason": "Power Button",
+        },
+        {
+            "SleepTime": "2026-01-02 12:00:00",
+            "WakeTime": "2026-01-02 13:00:00",
+            "Reason": "Network Adapter",
+        },
     ]
 
     event_viewer.run_cli("2026-01-01", "2026-01-02")
 
     # Verify outputs
-    mock_print.assert_any_call("スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)")
+    mock_print.assert_any_call(
+        "スリープ復帰履歴を取得中... (開始: 2026-01-01, 終了: 2026-01-02)"
+    )
     mock_print.assert_any_call("-" * 80)
-    mock_print.assert_any_call("[1] スリープ日時: 2026-01-01 12:00:00 | 復帰日時: 2026-01-01 13:00:00 | 理由: Power Button")
-    mock_print.assert_any_call("[2] スリープ日時: 2026-01-02 12:00:00 | 復帰日時: 2026-01-02 13:00:00 | 理由: Network Adapter")
+    mock_print.assert_any_call(
+        "[1] スリープ日時: 2026-01-01 12:00:00 | 復帰日時: 2026-01-01 13:00:00 | 理由: Power Button"
+    )
+    mock_print.assert_any_call(
+        "[2] スリープ日時: 2026-01-02 12:00:00 | 復帰日時: 2026-01-02 13:00:00 | 理由: Network Adapter"
+    )
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_execute_wevtutil_query_permission_error(mock_run):
     # Simulate a PermissionError when executing the command
     mock_run.side_effect = PermissionError("Access denied")
@@ -280,17 +339,33 @@ def test_execute_wevtutil_query_permission_error(mock_run):
     with pytest.raises(RuntimeError) as excinfo:
         event_viewer._execute_wevtutil_query("*")
 
-    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(excinfo.value)
+    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(
+        excinfo.value
+    )
 
-@pytest.mark.parametrize("returncode, stdout, stderr", [
-    (5, b"", b""),
-    (0, b"Access is denied", b""),
-    (0, b"\x83A\x83N\x83Z\x83X\x82\xaa\x8b\x91\x94\xdb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd", b""), # "アクセスが拒否されました" in CP932
-    (0, b"", b"Access is denied"),
-    (0, b"", b"\xe3\x82\xa2\xe3\x82\xaf\xe3\x82\xbb\xe3\x82\xb9\xe3\x81\x8c\xe6\x8b\x92\xe5\x90\xa6\xe3\x81\x95\xe3\x82\x8c\xe3\x81\xbe\xe3\x81\x97\xe3\x81\x9f"), # "アクセスが拒否されました" in UTF-8
-])
-@patch('subprocess.run')
-def test_execute_wevtutil_query_access_denied_logic(mock_run, returncode, stdout, stderr):
+
+@pytest.mark.parametrize(
+    "returncode, stdout, stderr",
+    [
+        (5, b"", b""),
+        (0, b"Access is denied", b""),
+        (
+            0,
+            b"\x83A\x83N\x83Z\x83X\x82\xaa\x8b\x91\x94\xdb\x82\xb3\x82\xea\x82\xdc\x82\xb5\x82\xbd",
+            b"",
+        ),  # "アクセスが拒否されました" in CP932
+        (0, b"", b"Access is denied"),
+        (
+            0,
+            b"",
+            b"\xe3\x82\xa2\xe3\x82\xaf\xe3\x82\xbb\xe3\x82\xb9\xe3\x81\x8c\xe6\x8b\x92\xe5\x90\xa6\xe3\x81\x95\xe3\x82\x8c\xe3\x81\xbe\xe3\x81\x97\xe3\x81\x9f",
+        ),  # "アクセスが拒否されました" in UTF-8
+    ],
+)
+@patch("subprocess.run")
+def test_execute_wevtutil_query_access_denied_logic(
+    mock_run, returncode, stdout, stderr
+):
     mock_result = MagicMock()
     mock_result.returncode = returncode
     mock_result.stdout = stdout
@@ -300,9 +375,12 @@ def test_execute_wevtutil_query_access_denied_logic(mock_run, returncode, stdout
     with pytest.raises(RuntimeError) as excinfo:
         event_viewer._execute_wevtutil_query("*")
 
-    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(excinfo.value)
+    assert "アクセスが拒否されました。アプリケーションを管理者権限で実行してください。" in str(
+        excinfo.value
+    )
 
-@patch('subprocess.run')
+
+@patch("subprocess.run")
 def test_execute_wevtutil_query_cp932_decode_error_fallback_to_utf8(mock_run):
     # b'\xc2\x81' is invalid in CP932 but valid in UTF-8
     mock_result = MagicMock()
@@ -315,8 +393,11 @@ def test_execute_wevtutil_query_cp932_decode_error_fallback_to_utf8(mock_run):
     output = event_viewer._execute_wevtutil_query("*")
     assert output == b"\xc2\x81".decode("utf-8")
 
-@patch('subprocess.run')
-def test_execute_wevtutil_query_both_decode_error_fallback_to_replace(mock_run):
+
+@patch("subprocess.run")
+def test_execute_wevtutil_query_both_decode_error_fallback_to_replace(
+    mock_run,
+):
     # b'\x81' is invalid in both CP932 and UTF-8
     mock_result = MagicMock()
     mock_result.stdout = b"\x81"
@@ -327,42 +408,57 @@ def test_execute_wevtutil_query_both_decode_error_fallback_to_replace(mock_run):
     output = event_viewer._execute_wevtutil_query("*")
     assert output == b"\x81".decode("utf-8", errors="replace")
 
+
 @patch.dict(os.environ, {"SystemRoot": "D:\\WinNT"}, clear=True)
 def test_get_wevtutil_path_with_systemroot():
     event_viewer.get_wevtutil_path.cache_clear()
     expected = os.path.join("D:\\WinNT", "System32", "wevtutil.exe")
     assert event_viewer.get_wevtutil_path() == expected
 
+
 @patch.dict(os.environ, {}, clear=True)
 def test_get_wevtutil_path_without_systemroot():
     event_viewer.get_wevtutil_path.cache_clear()
     expected = os.path.join("C:\\Windows", "System32", "wevtutil.exe")
     assert event_viewer.get_wevtutil_path() == expected
+
+
 import pytest
 from unittest.mock import MagicMock, patch
 import event_viewer
 
-@pytest.mark.parametrize("start_y, start_m, delta, expected_y, expected_m", [
-    (2024, 1, 1, 2024, 2),
-    (2024, 1, 12, 2025, 1),
-    (2024, 12, 1, 2025, 1),
-    (2024, 1, -1, 2023, 12),
-    (2024, 1, -12, 2023, 1),
-    (2024, 12, -12, 2023, 12),
-    (2024, 5, 24, 2026, 5),
-    (2024, 5, -24, 2022, 5),
-    (2024, 1, 100, 2032, 5),
-    (2024, 1, -100, 2015, 9),
-])
-def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expected_m):
+
+@pytest.mark.parametrize(
+    "start_y, start_m, delta, expected_y, expected_m",
+    [
+        (2024, 1, 1, 2024, 2),
+        (2024, 1, 12, 2025, 1),
+        (2024, 12, 1, 2025, 1),
+        (2024, 1, -1, 2023, 12),
+        (2024, 1, -12, 2023, 1),
+        (2024, 12, -12, 2023, 12),
+        (2024, 5, 24, 2026, 5),
+        (2024, 5, -24, 2022, 5),
+        (2024, 1, 100, 2032, 5),
+        (2024, 1, -100, 2015, 9),
+    ],
+)
+def test_calendar_dialog_add_months(
+    start_y, start_m, delta, expected_y, expected_m
+):
     parent = MagicMock()
     target_entry = MagicMock()
     target_entry.get.return_value = f"{start_y}-{start_m:02d}-01"
 
     class MockIntVar:
-        def __init__(self, val=0): self.val = val
-        def set(self, val): self.val = val
-        def get(self): return self.val
+        def __init__(self, val=0):
+            self.val = val
+
+        def set(self, val):
+            self.val = val
+
+        def get(self):
+            return self.val
 
     y_var = MockIntVar(start_y)
     m_var = MockIntVar(start_m)
@@ -373,17 +469,25 @@ def test_calendar_dialog_add_months(start_y, start_m, delta, expected_y, expecte
             return y_var
         return m_var
 
-    with patch("event_viewer.CalendarDialog.create_widgets"), \
-         patch("event_viewer.CalendarDialog.update_calendar"), \
-         patch("tkinter.IntVar", side_effect=intvar_side_effect), \
-         patch("tkinter.Toplevel.__init__", return_value=None), \
-         patch("tkinter.Toplevel.grab_set"), \
-         patch("tkinter.Toplevel.transient"), \
-         patch("tkinter.Toplevel.update_idletasks"), \
-         patch("tkinter.Toplevel.geometry"), \
-         patch("tkinter.Toplevel.title"), \
-         patch("tkinter.Toplevel.withdraw"), \
-         patch("tkinter.Toplevel.deiconify"):
+    with patch("event_viewer.CalendarDialog.create_widgets"), patch(
+        "event_viewer.CalendarDialog.update_calendar"
+    ), patch("tkinter.IntVar", side_effect=intvar_side_effect), patch(
+        "tkinter.Toplevel.__init__", return_value=None
+    ), patch(
+        "tkinter.Toplevel.grab_set"
+    ), patch(
+        "tkinter.Toplevel.transient"
+    ), patch(
+        "tkinter.Toplevel.update_idletasks"
+    ), patch(
+        "tkinter.Toplevel.geometry"
+    ), patch(
+        "tkinter.Toplevel.title"
+    ), patch(
+        "tkinter.Toplevel.withdraw"
+    ), patch(
+        "tkinter.Toplevel.deiconify"
+    ):
 
         dialog = event_viewer.CalendarDialog(parent, target_entry)
         dialog.year_var = y_var
@@ -400,17 +504,25 @@ def test_calendar_dialog_prev_month():
     target_entry = MagicMock()
     target_entry.get.return_value = "2024-01-01"
 
-    with patch("event_viewer.CalendarDialog.create_widgets"), \
-         patch("event_viewer.CalendarDialog.update_calendar"), \
-         patch("tkinter.IntVar", MagicMock()), \
-         patch("tkinter.Toplevel.__init__", return_value=None), \
-         patch("tkinter.Toplevel.grab_set"), \
-         patch("tkinter.Toplevel.transient"), \
-         patch("tkinter.Toplevel.update_idletasks"), \
-         patch("tkinter.Toplevel.geometry"), \
-         patch("tkinter.Toplevel.title"), \
-         patch("tkinter.Toplevel.withdraw"), \
-         patch("tkinter.Toplevel.deiconify"):
+    with patch("event_viewer.CalendarDialog.create_widgets"), patch(
+        "event_viewer.CalendarDialog.update_calendar"
+    ), patch("tkinter.IntVar", MagicMock()), patch(
+        "tkinter.Toplevel.__init__", return_value=None
+    ), patch(
+        "tkinter.Toplevel.grab_set"
+    ), patch(
+        "tkinter.Toplevel.transient"
+    ), patch(
+        "tkinter.Toplevel.update_idletasks"
+    ), patch(
+        "tkinter.Toplevel.geometry"
+    ), patch(
+        "tkinter.Toplevel.title"
+    ), patch(
+        "tkinter.Toplevel.withdraw"
+    ), patch(
+        "tkinter.Toplevel.deiconify"
+    ):
 
         dialog = event_viewer.CalendarDialog(parent, target_entry)
         dialog.add_months = MagicMock()
@@ -425,17 +537,25 @@ def test_calendar_dialog_next_month():
     target_entry = MagicMock()
     target_entry.get.return_value = "2024-01-01"
 
-    with patch("event_viewer.CalendarDialog.create_widgets"), \
-         patch("event_viewer.CalendarDialog.update_calendar"), \
-         patch("tkinter.IntVar", MagicMock()), \
-         patch("tkinter.Toplevel.__init__", return_value=None), \
-         patch("tkinter.Toplevel.grab_set"), \
-         patch("tkinter.Toplevel.transient"), \
-         patch("tkinter.Toplevel.update_idletasks"), \
-         patch("tkinter.Toplevel.geometry"), \
-         patch("tkinter.Toplevel.title"), \
-         patch("tkinter.Toplevel.withdraw"), \
-         patch("tkinter.Toplevel.deiconify"):
+    with patch("event_viewer.CalendarDialog.create_widgets"), patch(
+        "event_viewer.CalendarDialog.update_calendar"
+    ), patch("tkinter.IntVar", MagicMock()), patch(
+        "tkinter.Toplevel.__init__", return_value=None
+    ), patch(
+        "tkinter.Toplevel.grab_set"
+    ), patch(
+        "tkinter.Toplevel.transient"
+    ), patch(
+        "tkinter.Toplevel.update_idletasks"
+    ), patch(
+        "tkinter.Toplevel.geometry"
+    ), patch(
+        "tkinter.Toplevel.title"
+    ), patch(
+        "tkinter.Toplevel.withdraw"
+    ), patch(
+        "tkinter.Toplevel.deiconify"
+    ):
 
         dialog = event_viewer.CalendarDialog(parent, target_entry)
         dialog.add_months = MagicMock()
@@ -444,51 +564,75 @@ def test_calendar_dialog_next_month():
 
         dialog.add_months.assert_called_once_with(1)
 
-@pytest.mark.parametrize("date_str, expected", [
-    ("2024-01-01", True),
-    ("2024-02-29", True),
-    ("2023-02-29", False),
-    ("2024-13-01", False),
-    ("01-01-2024", False),
-    ("2024/01/01", False),
-    ("not-a-date", False),
-    ("", True),
-    (None, True),
-])
+
+@pytest.mark.parametrize(
+    "date_str, expected",
+    [
+        ("2024-01-01", True),
+        ("2024-02-29", True),
+        ("2023-02-29", False),
+        ("2024-13-01", False),
+        ("01-01-2024", False),
+        ("2024/01/01", False),
+        ("not-a-date", False),
+        ("", True),
+        (None, True),
+    ],
+)
 def test_validate_date(date_str, expected):
     assert event_viewer.validate_date(date_str) is expected
 
-@patch('event_viewer.local_to_utc_str')
+
+@patch("event_viewer.local_to_utc_str")
 def test_build_wevtutil_query(mock_local_to_utc_str):
-    mock_local_to_utc_str.side_effect = lambda d, is_end_of_day=False: f"{d}T{'23:59:59' if is_end_of_day else '00:00:00'}Z"
+    mock_local_to_utc_str.side_effect = (
+        lambda d, is_end_of_day=False: f"{d}T{'23:59:59' if is_end_of_day else '00:00:00'}Z"
+    )
 
     # Both None
     q = event_viewer._build_wevtutil_query()
-    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507))]]"
+    assert (
+        q
+        == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507))]]"
+    )
 
     # Only start
     q = event_viewer._build_wevtutil_query(start_date="2024-01-01")
-    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z']]]"
+    assert (
+        q
+        == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z']]]"
+    )
 
     # Only end
     q = event_viewer._build_wevtutil_query(end_date="2024-01-02")
-    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime<='2024-01-02T23:59:59Z']]]"
+    assert (
+        q
+        == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime<='2024-01-02T23:59:59Z']]]"
+    )
 
     # Both
-    q = event_viewer._build_wevtutil_query(start_date="2024-01-01", end_date="2024-01-02")
-    assert q == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
+    q = event_viewer._build_wevtutil_query(
+        start_date="2024-01-01", end_date="2024-01-02"
+    )
+    assert (
+        q
+        == "*[System[((Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1) or (Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=507)) and TimeCreated[@SystemTime>='2024-01-01T00:00:00Z' and @SystemTime<='2024-01-02T23:59:59Z']]]"
+    )
+
 
 def test_parse_wake_events_xml_empty():
     """Test _parse_wake_events_xml with empty or whitespace-only strings."""
     assert event_viewer._parse_wake_events_xml("") == []
     assert event_viewer._parse_wake_events_xml("   \n  ") == []
 
+
 def test_parse_wake_events_xml_invalid():
     """Test _parse_wake_events_xml with invalid XML to ensure it raises RuntimeError."""
     with pytest.raises(RuntimeError, match="Failed to parse XML"):
         event_viewer._parse_wake_events_xml("<invalid>")
 
-@patch('event_viewer.parse_utc_to_local')
+
+@patch("event_viewer.parse_utc_to_local")
 def test_parse_wake_events_xml_valid(mock_parse):
     """Test _parse_wake_events_xml with valid XML output containing actual values."""
     mock_parse.side_effect = lambda x: f"LOCAL_{x}"
@@ -508,8 +652,10 @@ def test_parse_wake_events_xml_valid(mock_parse):
     assert res[0]["WakeTime"] == "LOCAL_2024-01-01T08:00:00Z"
     assert res[0]["Reason"] == "Test Reason"
 
+
 def test_parse_wake_events_xml_wake_type_fallbacks():
     """Test _parse_wake_events_xml fallback logic when WakeSourceText is empty."""
+
     def get_xml(wake_type):
         return f"""
         <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
@@ -519,14 +665,29 @@ def test_parse_wake_events_xml_wake_type_fallbacks():
         </Event>
         """
 
-    assert event_viewer._parse_wake_events_xml(get_xml("0"))[0]["Reason"] == "不明 (Unknown)"
-    assert event_viewer._parse_wake_events_xml(get_xml("1"))[0]["Reason"] == "電源ボタン (Power Button)"
-    assert event_viewer._parse_wake_events_xml(get_xml("8"))[0]["Reason"] == "デバイス または API (Device / API)"
-    assert event_viewer._parse_wake_events_xml(get_xml("99"))[0]["Reason"] == "Type 99"
-    assert event_viewer._parse_wake_events_xml(get_xml(""))[0]["Reason"] == "不明"
+    assert (
+        event_viewer._parse_wake_events_xml(get_xml("0"))[0]["Reason"]
+        == "不明 (Unknown)"
+    )
+    assert (
+        event_viewer._parse_wake_events_xml(get_xml("1"))[0]["Reason"]
+        == "電源ボタン (Power Button)"
+    )
+    assert (
+        event_viewer._parse_wake_events_xml(get_xml("8"))[0]["Reason"]
+        == "デバイス または API (Device / API)"
+    )
+    assert (
+        event_viewer._parse_wake_events_xml(get_xml("99"))[0]["Reason"]
+        == "Type 99"
+    )
+    assert (
+        event_viewer._parse_wake_events_xml(get_xml(""))[0]["Reason"] == "不明"
+    )
 
-@patch('event_viewer.WakeEventViewerApp')
-@patch('event_viewer.tk.Tk')
+
+@patch("event_viewer.WakeEventViewerApp")
+@patch("event_viewer.tk.Tk")
 def test_run_gui(mock_tk_class, mock_app_class):
     # Setup mock root instance returned by tk.Tk()
     mock_root_instance = MagicMock()
@@ -543,6 +704,7 @@ def test_run_gui(mock_tk_class, mock_app_class):
 
     # Verify mainloop was called on the root window to start the GUI
     mock_root_instance.mainloop.assert_called_once()
+
 
 @patch("event_viewer.messagebox")
 def test_on_fetch_error_direct(mock_msgbox):
@@ -593,7 +755,6 @@ def test_on_fetch_success_with_events_direct():
     )
 
 
-
 def test_calendar_dialog_select_date():
     target_entry = MagicMock()
     target_entry.get.return_value = "2024-01-01"
@@ -608,6 +769,7 @@ def test_calendar_dialog_select_date():
     target_entry.insert.assert_called_once_with(0, "2024-05-04")
     dialog.destroy.assert_called_once()
 
+
 @patch("event_viewer.get_wake_events")
 def test_fetch_task_success(mock_get_events):
     app = MagicMock()
@@ -617,7 +779,10 @@ def test_fetch_task_success(mock_get_events):
     event_viewer.WakeEventViewerApp.fetch_task(app, "2024-01-01", "2024-01-02")
 
     mock_get_events.assert_called_once_with("2024-01-01", "2024-01-02")
-    app.root.after.assert_called_once_with(0, app._on_fetch_success, mock_events)
+    app.root.after.assert_called_once_with(
+        0, app._on_fetch_success, mock_events
+    )
+
 
 @patch("event_viewer.get_wake_events")
 def test_fetch_task_error(mock_get_events):
@@ -627,7 +792,10 @@ def test_fetch_task_error(mock_get_events):
     event_viewer.WakeEventViewerApp.fetch_task(app, "2024-01-01", "2024-01-02")
 
     mock_get_events.assert_called_once_with("2024-01-01", "2024-01-02")
-    app.root.after.assert_called_once_with(0, app._on_fetch_error, "test error")
+    app.root.after.assert_called_once_with(
+        0, app._on_fetch_error, "test error"
+    )
+
 
 def test_on_tree_select_no_selection():
     app = MagicMock()
@@ -640,6 +808,7 @@ def test_on_tree_select_no_selection():
     app.details_text.insert.assert_not_called()
     app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
 
+
 def test_on_tree_select_with_selection_and_reason():
     app = MagicMock()
     app.tree.selection.return_value = ("item1",)
@@ -651,8 +820,11 @@ def test_on_tree_select_with_selection_and_reason():
 
     app.tree.item.assert_called_once_with("item1")
     app.details_text.delete.assert_called_once_with(1.0, event_viewer.tk.END)
-    app.details_text.insert.assert_called_once_with(event_viewer.tk.END, "Detailed Reason")
+    app.details_text.insert.assert_called_once_with(
+        event_viewer.tk.END, "Detailed Reason"
+    )
     app.details_text.config.assert_called_with(state=event_viewer.tk.DISABLED)
+
 
 def test_on_tree_select_with_selection_no_reason():
     app = MagicMock()
@@ -674,7 +846,7 @@ def test_map_kp_507_reason():
     assert "電源ボタン (Power Button)" in event_viewer._map_kp_507_reason("1")
     assert "液晶カバーの開閉 (Lid)" in event_viewer._map_kp_507_reason("15")
     assert "自動メンテナンス" in event_viewer._map_kp_507_reason("16777220")
-    
+
     # 存在しないコード
     assert event_viewer._map_kp_507_reason("999") == "コード 999"
     # 数値以外
@@ -708,7 +880,7 @@ def test_parse_wake_events_xml_with_kp_507_merge():
       </EventData>
     </Event>
     """
-    
+
     events = event_viewer._parse_wake_events_xml(xml_data)
     assert len(events) == 1
     assert "電源ボタン (Power Button)" in events[0]["Reason"]
