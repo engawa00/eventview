@@ -576,6 +576,7 @@ def test_calendar_dialog_next_month():
         ("2024/01/01", False),
         ("not-a-date", False),
         ("", True),
+        (" ", False),
         (None, True),
     ],
 )
