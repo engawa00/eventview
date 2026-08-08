@@ -375,9 +375,9 @@ def _parse_wake_events_xml(xml_output: str) -> List[Dict[str, str]]:
 
     events = next(
         (
-            nodes
+            root.findall(p, _EVENT_NS)
             for p in _tag_candidates("Event")
-            if (nodes := root.findall(p, _EVENT_NS))
+            if root.findall(p, _EVENT_NS)
         ),
         [],
     )
